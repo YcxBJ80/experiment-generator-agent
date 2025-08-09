@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🚀 Interactive Experiment Platform with Perplexity MCP Integration
 
 > A cutting-edge hackathon project showcasing AI-powered experiment generation with real-time knowledge integration
@@ -162,3 +163,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Built with ❤️ for the hackathon - showcasing the future of AI-powered interactive content generation!**
+=======
+# TRAE-Hackathon-demo-agent
+Interactive experiment platform with Perplexity MCP integration - A hackathon project featuring AI-powered experiment generation with real-time knowledge integration
+>>>>>>> fb0a5ffb05ca77db30cc370e782ad80dff937f66
