@@ -9,6 +9,7 @@ interface Message {
   type: 'user' | 'assistant';
   timestamp: Date;
   experiment_id?: string;
+  isTyping?: boolean;
 }
 
 interface Conversation {
@@ -25,7 +26,11 @@ export default function Home() {
   const [inputMessage, setInputMessage] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // 流式响应状态
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
 
   // 加载对话历史
   useEffect(() => {
@@ -89,6 +94,8 @@ export default function Home() {
   };
 
   const currentConv = conversations.find(conv => conv.id === currentConversation);
+
+
 
   const handleNewChat = async () => {
     try {
@@ -198,52 +205,74 @@ export default function Home() {
         }));
       }
       
-      // 调用API生成实验
-      const response = await apiClient.generateExperiment({
-        prompt: messageContent,
-        conversation_id: currentConversation
+      // 创建空的助手消息用于流式响应
+      const assistantMessageResponse = await apiClient.createMessage({
+        conversation_id: currentConversation,
+        content: '',
+        type: 'assistant'
       });
-
-      if (response.success && response.data) {
-        const assistantContent = `我已经为您创建了一个实验演示。这个实验展示了${messageContent}的相关内容，您可以点击下方按钮查看交互式演示。`;
-        
-        // 保存助手消息到数据库
-        const assistantMessageResponse = await apiClient.createMessage({
-          conversation_id: currentConversation,
-          content: assistantContent,
+      
+      if (assistantMessageResponse.success && assistantMessageResponse.data) {
+        const assistantMessage: Message = {
+          id: assistantMessageResponse.data.id,
+          content: '',
           type: 'assistant',
-          experiment_id: response.data.experiment_id,
-          html_content: response.data.html_content,
-          css_content: response.data.css_content,
-          js_content: response.data.js_content
-        });
+          timestamp: new Date(assistantMessageResponse.data.created_at),
+          isTyping: true
+        };
         
-        if (assistantMessageResponse.success && assistantMessageResponse.data) {
-          const assistantMessage: Message = {
-            id: assistantMessageResponse.data.id,
-            content: assistantMessageResponse.data.content,
-            type: 'assistant',
-            timestamp: new Date(assistantMessageResponse.data.created_at),
-            experiment_id: assistantMessageResponse.data.experiment_id
-          };
-          
-          // 更新本地状态
-          setConversations(prev => prev.map(conv => 
-            conv.id === currentConversation 
-              ? { ...conv, messages: [...conv.messages, assistantMessage], lastUpdated: new Date() }
-              : conv
-          ));
-        }
-
-        // 存储实验数据到localStorage（简单实现）
-        localStorage.setItem(`experiment_${response.data.experiment_id}`, JSON.stringify(response.data));
+        // 添加空的助手消息到状态
+        setConversations(prev => prev.map(conv => 
+          conv.id === currentConversation 
+            ? { ...conv, messages: [...conv.messages, assistantMessage], lastUpdated: new Date() }
+            : conv
+        ));
         
-        // 自动跳转到demo页面
-        setTimeout(() => {
-          navigate(`/demo/${response.data.experiment_id}`);
-        }, 1000);
-      } else {
-        throw new Error(response.error || '生成实验失败');
+        // 设置流式响应状态
+        setStreamingMessageId(assistantMessageResponse.data.id);
+        
+        // 调用流式API生成实验
+         await apiClient.generateExperimentStream(
+           {
+             prompt: messageContent,
+             conversation_id: currentConversation,
+             message_id: assistantMessageResponse.data.id
+           },
+           (chunk: string) => {
+             // 实时更新消息内容
+             setConversations(prev => prev.map(conv => 
+               conv.id === currentConversation 
+                 ? {
+                     ...conv,
+                     messages: conv.messages.map(msg => 
+                       msg.id === assistantMessageResponse.data.id 
+                         ? { ...msg, content: msg.content + chunk }
+                         : msg
+                     )
+                   }
+                 : conv
+             ));
+           }
+         );
+         
+         // 流式响应完成，更新状态并重新加载消息以获取experiment_id
+         setConversations(prev => prev.map(conv => 
+           conv.id === currentConversation 
+             ? {
+                 ...conv,
+                 messages: conv.messages.map(msg => 
+                   msg.id === assistantMessageResponse.data.id 
+                     ? { ...msg, isTyping: false }
+                     : msg
+                 )
+               }
+             : conv
+         ));
+         
+         // 延迟一下再重新加载消息，确保后端已经完成更新
+         setTimeout(() => {
+           loadMessagesForConversation(currentConversation);
+         }, 1000);
       }
     } catch (error) {
       console.error('生成实验失败:', error);
@@ -272,122 +301,151 @@ export default function Home() {
       }
     } finally {
       setIsGenerating(false);
+      setStreamingMessageId(null);
     }
   };
 
   return (
-    <div className="h-screen bg-dark-bg flex">
-      {/* 左侧聊天历史区域 */}
-      <div className="w-80 bg-dark-bg-secondary border-r border-dark-border flex flex-col">
-        {/* 标题 */}
+    <div className="h-screen bg-dark-bg flex relative">
+      {/* 鼠标悬停触发区域 - 左侧1/6宽度，只在边栏关闭时显示 */}
+      {!isSidebarOpen && (
+        <div 
+          className="fixed left-0 top-0 h-full z-30"
+          style={{ width: 'calc(100vw / 6)' }}
+          onMouseEnter={() => setIsSidebarOpen(true)}
+        />
+      )}
+
+      {/* 聊天历史边栏 */}
+      <div 
+        className={`fixed left-0 top-0 h-full bg-dark-bg-secondary border-r border-dark-border z-20 transition-transform duration-300 ease-in-out ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+        style={{ width: '320px' }}
+        onMouseLeave={() => setIsSidebarOpen(false)}
+      >
         <div className="p-4 border-b border-dark-border">
-          <h1 className="text-lg font-semibold text-dark-text flex items-center gap-2">
-            <MessageSquare className="w-5 h-5" />
-            实验生成平台
-          </h1>
-        </div>
-        
-        {/* 新建聊天按钮 */}
-        <div className="p-2">
           <button
             onClick={handleNewChat}
-            className="w-full flex items-center gap-2 px-3 py-2 bg-dark-bg-tertiary hover:bg-dark-bg-tertiary/80 text-dark-text rounded-low transition-colors"
+            className="w-full flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-low transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span className="text-sm">新建聊天</span>
+            新建对话
           </button>
         </div>
         
-        {/* 对话历史列表 */}
-        <div className="flex-1 overflow-y-auto p-2">
-          {isLoading ? (
-            <div className="flex items-center justify-center p-4">
-              <div className="text-dark-text-muted text-sm">加载中...</div>
-            </div>
-          ) : conversations.length === 0 ? (
-            <div className="flex items-center justify-center p-4">
-              <div className="text-dark-text-muted text-sm">暂无对话历史</div>
-            </div>
-          ) : (
-            conversations.map((conv) => (
-              <div
-                key={conv.id}
-                onClick={() => {
-                  setCurrentConversation(conv.id);
-                  // 如果该对话还没有加载消息，则加载消息
-                  if (conv.messages.length === 0) {
-                    loadMessagesForConversation(conv.id);
-                  }
-                }}
-                className={`group p-3 mb-2 rounded-low cursor-pointer transition-colors relative ${
-                  currentConversation === conv.id
-                    ? 'bg-dark-bg-tertiary'
-                    : 'hover:bg-dark-bg-tertiary/50'
-                }`}
-              >
-                <div className="text-sm font-medium text-dark-text truncate pr-8">
-                  {conv.title}
-                </div>
-                <div className="text-xs text-dark-text-muted mt-1">
-                  {conv.lastUpdated.toLocaleTimeString()}
+        <div className="flex-1 overflow-y-auto">
+          {conversations.map((conv) => (
+            <div
+              key={conv.id}
+              onClick={() => {
+                setCurrentConversation(conv.id);
+                // 如果该对话还没有加载消息，则加载消息
+                if (conv.messages.length === 0) {
+                  loadMessagesForConversation(conv.id);
+                }
+              }}
+              className={`p-4 border-b border-dark-border cursor-pointer hover:bg-dark-bg-tertiary transition-colors ${
+                currentConversation === conv.id ? 'bg-dark-bg-tertiary' : ''
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <MessageSquare className="w-4 h-4 text-dark-text-secondary flex-shrink-0" />
+                  <span className="text-sm text-dark-text font-medium truncate">
+                    {conv.title || '新对话'}
+                  </span>
                 </div>
                 <button
                   onClick={(e) => handleDeleteConversation(conv.id, e)}
-                  className="absolute top-2 right-2 p-1 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 rounded transition-all duration-200 z-10"
+                  className="p-1 text-dark-text-secondary hover:text-red-400 hover:bg-red-400/10 rounded transition-colors flex-shrink-0"
                   title="删除对话"
                 >
-                  <Trash2 className="w-4 h-4 text-red-400 hover:text-red-300" />
+                  <Trash2 className="w-3 h-3" />
                 </button>
               </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* 右侧对话区域 */}
-      <div className="flex-1 flex flex-col">
-        {/* 对话内容 */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {currentConv?.messages.map((message) => (
-            <div
-              key={message.id}
-              className={`mb-6 flex ${
-                message.type === 'user' ? 'justify-end' : 'justify-start'
-              }`}
-            >
-              <div
-                className={`max-w-2xl px-4 py-3 rounded-low ${
-                  message.type === 'user'
-                    ? 'bg-accent-blue text-dark-text'
-                    : 'bg-dark-bg-secondary text-dark-text-secondary'
-                }`}
-              >
-                <div className="text-sm">{message.content}</div>
-                <div className="flex items-center justify-between mt-2">
-                  <div className="text-xs text-dark-text-muted">
-                    {message.timestamp.toLocaleTimeString()}
-                  </div>
-                  {message.type === 'assistant' && message.experiment_id && (
-                    <button
-                      onClick={() => navigate(`/demo/${message.experiment_id}`)}
-                      className="flex items-center gap-1 px-2 py-1 bg-accent-blue hover:bg-accent-gray rounded-low text-xs text-dark-text transition-colors"
-                    >
-                      <Play className="w-3 h-3" />
-                      查看实验
-                    </button>
-                  )}
-                </div>
+              <div className="text-xs text-dark-text-secondary">
+                {conv.lastUpdated ? new Date(conv.lastUpdated).toLocaleDateString() : ''}
               </div>
             </div>
           ))}
-          
-          {/* 生成状态指示器 */}
-          {isGenerating && (
-            <div className="flex justify-start mb-6">
-              <div className="bg-dark-bg-secondary px-4 py-3 rounded-low">
-                <div className="flex items-center gap-2 text-dark-text-secondary">
-                  <div className="w-2 h-2 bg-accent-blue rounded-full animate-pulse"></div>
-                  <span className="text-sm">正在生成实验...</span>
+        </div>
+      </div>
+
+      {/* 主内容区域 */}
+      <div className="flex-1 flex flex-col">
+        {/* 顶部标题栏 */}
+        <div className="bg-dark-bg-secondary border-b border-dark-border p-4">
+          <div className="flex items-center justify-center">
+            <h1 className="text-2xl font-bold text-dark-text">
+              🧪 Interactive Experiment Platform
+            </h1>
+          </div>
+          <p className="text-center text-dark-text-secondary mt-2">
+            Create interactive experiments with AI-powered generation
+          </p>
+        </div>
+
+        {/* 消息区域 */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {currentConversation && conversations.find(c => c.id === currentConversation) ? (
+            <div className="max-w-4xl mx-auto space-y-4">
+              {conversations
+                .find(c => c.id === currentConversation)
+                ?.messages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[80%] p-4 rounded-low ${
+                        message.type === 'user'
+                          ? 'bg-primary text-white'
+                          : 'bg-dark-bg-secondary text-dark-text border border-dark-border'
+                      }`}
+                    >
+                      <div className="whitespace-pre-wrap">
+                        {message.content}
+                        {(message.isTyping || streamingMessageId === message.id) && (
+                          <span className="inline-block w-2 h-5 bg-primary ml-1 animate-pulse"></span>
+                        )}
+                      </div>
+                      
+                      {/* 如果消息有实验ID且不在流式响应中，显示查看演示按钮 */}
+                      {message.experiment_id && streamingMessageId !== message.id && (
+                        <div className="mt-4 pt-3 border-t border-dark-border">
+                          <button
+                            onClick={() => navigate(`/demo/${message.experiment_id}`)}
+                            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-low transition-colors"
+                          >
+                            <Play className="w-4 h-4" />
+                            查看交互式演示
+                          </button>
+                        </div>
+                      )}
+                      
+                      {message.timestamp && (
+                        <div className="text-xs opacity-70 mt-2">
+                          {new Date(message.timestamp).toLocaleTimeString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              <div ref={messagesEndRef} />
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-6xl mb-4">🧪</div>
+                <h2 className="text-2xl font-bold text-dark-text mb-2">
+                  Welcome to Interactive Experiment Platform
+                </h2>
+                <p className="text-dark-text-secondary mb-6 max-w-md">
+                  Describe any experiment or concept you'd like to explore, and I'll create an interactive demo for you.
+                </p>
+                <div className="text-sm text-dark-text-secondary">
+                  Hover over the left edge to access your conversation history
                 </div>
               </div>
             </div>
@@ -396,24 +454,27 @@ export default function Home() {
 
         {/* 输入区域 */}
         <div className="border-t border-dark-border p-4">
-          <div className="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="描述您想要的实验..."
-              className="flex-1 px-4 py-3 bg-dark-bg-secondary border border-dark-border rounded-low text-dark-text placeholder-dark-text-muted focus:outline-none focus:border-dark-border-light"
-              disabled={isGenerating}
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputMessage.trim() || isGenerating}
-              className="px-4 py-3 bg-accent-blue hover:bg-accent-gray disabled:opacity-50 disabled:cursor-not-allowed rounded-low transition-colors"
-            >
-              <Send className="w-5 h-5 text-dark-text" />
-            </button>
+          <div className="max-w-4xl mx-auto">
+            <div className="flex gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                placeholder="Describe the experiment you want to create..."
+                className="flex-1 px-4 py-3 bg-dark-bg-secondary border border-dark-border rounded-low text-dark-text placeholder-dark-text-secondary focus:outline-none focus:border-primary"
+                disabled={isGenerating}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={isGenerating || !inputMessage.trim()}
+                className="px-6 py-3 bg-primary hover:bg-primary-hover disabled:bg-dark-bg-tertiary disabled:text-dark-text-secondary text-white rounded-low transition-colors flex items-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                {isGenerating ? 'Generating...' : 'Send'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

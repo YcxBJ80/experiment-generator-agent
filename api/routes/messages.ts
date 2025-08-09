@@ -8,7 +8,7 @@ router.post('/', async (req, res) => {
   try {
     const { conversation_id, content, type, experiment_id, html_content, css_content, js_content } = req.body;
     
-    if (!conversation_id || !content || !type) {
+    if (!conversation_id || content === undefined || content === null || !type) {
       return res.status(400).json({ error: 'conversation_id, content, and type are required' });
     }
     
@@ -42,6 +42,25 @@ router.get('/conversation/:conversationId', async (req, res) => {
   } catch (error) {
     console.error('Error fetching messages:', error);
     res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+// Update a message
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    const updatedMessage = await DatabaseService.updateMessage(id, updates);
+    
+    if (!updatedMessage) {
+      return res.status(500).json({ error: 'Failed to update message' });
+    }
+    
+    res.json(updatedMessage);
+  } catch (error) {
+    console.error('Error updating message:', error);
+    res.status(500).json({ error: 'Failed to update message' });
   }
 });
 

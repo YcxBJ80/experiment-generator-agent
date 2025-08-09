@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { perplexityMCPClient } from '../lib/perplexityMcpClient.js';
 import { JavaScriptValidator } from '../lib/jsValidator.js';
+import { DatabaseService } from '../lib/supabase.js';
 
 // 确保环境变量已加载
 const __filename = fileURLToPath(import.meta.url);
@@ -101,7 +102,243 @@ interface GenerateExperimentResponse {
 }
 
 /**
- * 生成实验demo
+ * 流式生成实验demo
+ */
+router.post('/generate-stream', async (req: Request, res: Response) => {
+  console.log('🔥 流式端点被调用！');
+  console.log('请求体:', req.body);
+  try {
+    const { prompt, conversation_id, message_id }: GenerateExperimentRequest & { message_id?: string } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({
+        success: false,
+        error: '请提供实验需求描述'
+      });
+    }
+
+    // 设置SSE响应头
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    // 首先通过Perplexity MCP获取相关知识
+    console.log('正在获取Perplexity知识...');
+    const perplexityKnowledge = await perplexityMCPClient.getExperimentKnowledge(prompt);
+    console.log('Perplexity知识获取完成');
+
+    // 构建系统提示词
+    const systemPrompt = `You are an AI agent specialized in creating highly interactive and visually stunning HTML-based experiment demos with rich animations and dynamic visualizations.
+
+You follow this pipeline for every request:
+
+1. Understand User Request
+   - Carefully interpret the user's described experiment or concept.
+   - Ask clarifying questions if needed to ensure full understanding of the user's goal, audience, and constraints.
+
+2. Information Gathering via Perplexity MCP
+   - Use the Perplexity MCP tools to find accurate and relevant information about the experiment.
+   - Available Perplexity MCP tools:
+     * search: Execute search queries on Perplexity.ai with brief/normal/detailed response types
+     * get_documentation: Request documentation and examples for technologies/libraries
+     * find_apis: Find and evaluate APIs based on requirements and context
+     * check_deprecated_code: Analyze code snippets for deprecated features
+     * extract_url_content: Extract main article content from URLs using browser automation
+     * chat_perplexity: Maintain continuous conversation with Perplexity AI
+   - Summarize key concepts, physical principles, equations, or historical background necessary for the demo.
+   - Only use verified, factual information and cite Perplexity as the source.
+
+3. Interactive HTML Demo Creation with Rich Animations
+   - Generate a self-contained HTML file with embedded JavaScript and CSS as needed.
+   - ANIMATION REQUIREMENTS (CRITICAL):
+     * Include smooth, continuous animations that illustrate the core concepts
+     * Add particle systems where relevant (e.g., air molecules for Bernoulli's principle, electrons for circuits, atoms for chemical reactions)
+     * Use CSS animations, transitions, and JavaScript-driven animations extensively
+     * Create visual feedback for all user interactions (hover effects, click animations, parameter changes)
+     * Implement realistic physics simulations with proper timing and easing
+     * Add visual indicators like trails, paths, force vectors, field lines, or wave propagations
+     * Use color changes, size variations, and movement to show state changes
+     * Include loading animations and smooth transitions between different states
+   
+   - SPECIFIC ANIMATION EXAMPLES TO IMPLEMENT:
+     * For fluid dynamics: flowing particles, pressure visualization, streamlines
+     * For mechanics: moving objects with trails, force vectors, energy transformations
+     * For electricity: flowing electrons, field visualizations, sparks and glows
+     * For chemistry: molecular movements, bond formations/breaking, reaction progress
+     * For optics: light rays, wave propagations, interference patterns
+     * For thermodynamics: particle motion speed changes, heat flow visualization
+   
+   - INTERACTIVITY REQUIREMENTS:
+     * Include multiple sliders, buttons, and controls for real-time parameter adjustment
+     * Provide play/pause/reset controls for animations
+     * Add hover effects that reveal additional information or highlight components
+     * Implement click-and-drag interactions where appropriate
+     * Show real-time calculations and measurements
+     * Include multiple viewing modes or perspectives
+   
+   - VISUAL DESIGN REQUIREMENTS:
+     * Use modern, clean design with subtle shadows and gradients
+     * Implement responsive layouts that work on different screen sizes
+     * Add visual depth with layered elements and proper z-indexing
+     * Use consistent color schemes that enhance understanding
+     * Include clear labels, legends, and measurement displays
+   
+   - The code should be clean, well-commented, and runnable as-is with no external dependencies.
+   - Provide clear instructions for how to use the demo within the HTML.
+   - IMPORTANT STYLING REQUIREMENTS:
+     * ALL text content must use dark colors (e.g., #000000, #333333, #2d3748, #1a202c, or other dark shades)
+     * ALL backgrounds must use light colors (e.g., #ffffff, #f7fafc, #edf2f7, #e2e8f0, or other light shades)
+     * Ensure sufficient contrast between text and background for readability
+     * Apply these color constraints to all elements including buttons, labels, headings, and body text
+
+4. Output Format
+   - First, present a short summary of the gathered information and the animations you will include.
+   - Then, output the complete HTML code inside a fenced code block labeled with \`html\`.
+   - Make sure the code is correct and free of syntax errors.
+
+General Rules:
+- Always aim for maximum visual impact and educational value through animations.
+- Prioritize smooth, realistic animations that enhance understanding.
+- Keep accessibility and clear visualization in mind.
+- Avoid unverified or unsafe algorithms/experiments.
+- Use neutral and factual tone in summaries.
+- If the request is vague, ask questions before starting.
+- If something is physically dangerous, simulate it safely instead of providing real-life unsafe instructions.
+
+User request: "${prompt}"
+
+You have the following Perplexity knowledge available (already retrieved):
+${perplexityKnowledge}
+
+Now produce the summary followed by a complete, standalone HTML document inside a fenced code block labeled html. Focus heavily on creating stunning animations and visual effects that make the concepts come alive. Do not include any external URLs or dependencies.`;
+
+    // 调用OpenAI API生成实验（流式）
+    console.log('🔍 检查openai客户端状态:', !!openai);
+    if (openai) {
+      try {
+        console.log('🚀 开始流式调用OpenAI API...');
+        console.log('模型:', 'openai/gpt-5-mini');
+        console.log('提示词长度:', prompt.length);
+        
+        const stream = await openai.chat.completions.create({
+          model: 'openai/gpt-5-mini',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 40000,
+          stream: true
+        });
+
+        let fullContent = '';
+        let chunkCount = 0;
+        
+        for await (const chunk of stream) {
+          if (chunk.choices && chunk.choices[0] && chunk.choices[0].delta && chunk.choices[0].delta.content) {
+            const content = chunk.choices[0].delta.content;
+            fullContent += content;
+            chunkCount++;
+            
+            // 发送SSE格式的流式数据到前端
+            res.write(`data: ${content}\n\n`);
+            
+            if (chunkCount % 10 === 0) {
+              console.log(`📦 已发送 ${chunkCount} 个chunks，当前长度: ${fullContent.length}`);
+            }
+          }
+        }
+        
+        // 发送完成信号
+        res.write('data: [DONE]\n\n');
+        res.end();
+        
+        console.log('✅ 流式响应完成，总chunks:', chunkCount, '总长度:', fullContent.length);
+        
+        // 在流式响应完成后，创建实验记录并更新消息
+        if (fullContent && message_id) {
+          try {
+            console.log('🔧 开始处理实验数据和更新消息...');
+            
+            // 解析生成的内容，提取HTML代码块
+            const htmlMatch = fullContent.match(/```html\s*([\s\S]*?)\s*```/);
+            if (htmlMatch) {
+              const htmlContent = htmlMatch[1].trim();
+              
+              // 生成实验ID
+              const experiment_id = randomUUID();
+              
+              // 从HTML内容中提取标题（如果有的话）
+              const titleMatch = htmlContent.match(/<title>(.*?)<\/title>/i);
+              const title = titleMatch ? titleMatch[1] : '实验演示';
+              
+              // 创建实验记录（这里简化处理，实际应该有完整的实验数据结构）
+              const experimentData = {
+                experiment_id,
+                title,
+                description: `基于提示词"${prompt}"生成的实验演示`,
+                html_content: htmlContent,
+                css_content: '', // 流式生成的是完整HTML，CSS已内嵌
+                js_content: '',  // 流式生成的是完整HTML，JS已内嵌
+                parameters: [],
+                status: 'completed'
+              };
+              
+              console.log('📝 实验数据准备完成，experiment_id:', experiment_id);
+              
+              // 更新消息，添加experiment_id和内容
+              await DatabaseService.updateMessage(message_id, {
+                content: fullContent,
+                experiment_id: experiment_id,
+                html_content: htmlContent
+              });
+              
+              console.log('✅ 消息更新完成，添加了experiment_id:', experiment_id);
+            } else {
+              console.warn('⚠️ 未能从生成内容中提取HTML代码块');
+            }
+          } catch (error) {
+            console.error('❌ 处理实验数据或更新消息时出错:', error);
+          }
+        } else {
+          console.warn('⚠️ 缺少fullContent或message_id，跳过实验记录创建');
+        }
+        
+      } catch (error) {
+        console.error('OpenAI API调用失败:', error);
+        res.write(`data: \n\n❌ 生成实验时出现错误：${error instanceof Error ? error.message : '未知错误'}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      }
+    } else {
+      res.write('data: \n\n❌ OpenAI客户端未初始化\n\n');
+      res.write('data: [DONE]\n\n');
+      res.end();
+    }
+    
+  } catch (error) {
+    console.error('生成实验失败:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : '生成实验失败'
+      });
+    }
+  }
+});
+
+/**
+ * 生成实验demo（非流式，保留兼容性）
  */
 router.post('/generate', async (req: Request, res: Response) => {
   try {
@@ -122,12 +359,13 @@ router.post('/generate', async (req: Request, res: Response) => {
     let attempts = 0;
 
     // 构建新的系统提示词（要求输出概述 + `html` 代码块的完整HTML文档）
-    const systemPrompt = `You are an AI agent specialized in creating interactive HTML-based experiment demos.
+    const systemPrompt = `You are an AI agent specialized in creating highly interactive and visually stunning HTML-based experiment demos with rich animations and dynamic visualizations.
+
 You follow this pipeline for every request:
 
 1. Understand User Request
-   - Carefully interpret the user’s described experiment or concept.
-   - Ask clarifying questions if needed to ensure full understanding of the user’s goal, audience, and constraints.
+   - Carefully interpret the user's described experiment or concept.
+   - Ask clarifying questions if needed to ensure full understanding of the user's goal, audience, and constraints.
 
 2. Information Gathering via Perplexity MCP
    - Use the Perplexity MCP tools to find accurate and relevant information about the experiment.
@@ -141,20 +379,57 @@ You follow this pipeline for every request:
    - Summarize key concepts, physical principles, equations, or historical background necessary for the demo.
    - Only use verified, factual information and cite Perplexity as the source.
 
-3. Interactive HTML Demo Creation
+3. Interactive HTML Demo Creation with Rich Animations
    - Generate a self-contained HTML file with embedded JavaScript and CSS as needed.
-   - Ensure the demo is interactive, visually appealing, and educational.
-   - Include UI elements such as sliders, buttons, charts, or animations to let the user manipulate experiment parameters.
-   - The code should be clean, commented, and runnable as-is with no external dependencies (unless explicitly requested).
-   - Provide brief instructions for how to use the demo within the HTML (as visible text or in comments).
+   - ANIMATION REQUIREMENTS (CRITICAL):
+     * Include smooth, continuous animations that illustrate the core concepts
+     * Add particle systems where relevant (e.g., air molecules for Bernoulli's principle, electrons for circuits, atoms for chemical reactions)
+     * Use CSS animations, transitions, and JavaScript-driven animations extensively
+     * Create visual feedback for all user interactions (hover effects, click animations, parameter changes)
+     * Implement realistic physics simulations with proper timing and easing
+     * Add visual indicators like trails, paths, force vectors, field lines, or wave propagations
+     * Use color changes, size variations, and movement to show state changes
+     * Include loading animations and smooth transitions between different states
+   
+   - SPECIFIC ANIMATION EXAMPLES TO IMPLEMENT:
+     * For fluid dynamics: flowing particles, pressure visualization, streamlines
+     * For mechanics: moving objects with trails, force vectors, energy transformations
+     * For electricity: flowing electrons, field visualizations, sparks and glows
+     * For chemistry: molecular movements, bond formations/breaking, reaction progress
+     * For optics: light rays, wave propagations, interference patterns
+     * For thermodynamics: particle motion speed changes, heat flow visualization
+   
+   - INTERACTIVITY REQUIREMENTS:
+     * Include multiple sliders, buttons, and controls for real-time parameter adjustment
+     * Provide play/pause/reset controls for animations
+     * Add hover effects that reveal additional information or highlight components
+     * Implement click-and-drag interactions where appropriate
+     * Show real-time calculations and measurements
+     * Include multiple viewing modes or perspectives
+   
+   - VISUAL DESIGN REQUIREMENTS:
+     * Use modern, clean design with subtle shadows and gradients
+     * Implement responsive layouts that work on different screen sizes
+     * Add visual depth with layered elements and proper z-indexing
+     * Use consistent color schemes that enhance understanding
+     * Include clear labels, legends, and measurement displays
+   
+   - The code should be clean, well-commented, and runnable as-is with no external dependencies.
+   - Provide clear instructions for how to use the demo within the HTML.
+   - IMPORTANT STYLING REQUIREMENTS:
+     * ALL text content must use dark colors (e.g., #000000, #333333, #2d3748, #1a202c, or other dark shades)
+     * ALL backgrounds must use light colors (e.g., #ffffff, #f7fafc, #edf2f7, #e2e8f0, or other light shades)
+     * Ensure sufficient contrast between text and background for readability
+     * Apply these color constraints to all elements including buttons, labels, headings, and body text
 
 4. Output Format
-   - First, present a short summary of the gathered information.
+   - First, present a short summary of the gathered information and the animations you will include.
    - Then, output the complete HTML code inside a fenced code block labeled with \`html\`.
    - Make sure the code is correct and free of syntax errors.
 
 General Rules:
-- Always aim for high educational value.
+- Always aim for maximum visual impact and educational value through animations.
+- Prioritize smooth, realistic animations that enhance understanding.
 - Keep accessibility and clear visualization in mind.
 - Avoid unverified or unsafe algorithms/experiments.
 - Use neutral and factual tone in summaries.
@@ -166,7 +441,7 @@ User request: "${prompt}"
 You have the following Perplexity knowledge available (already retrieved):
 ${perplexityKnowledge}
 
-Now produce the summary followed by a complete, standalone HTML document inside a fenced code block labeled html. Do not include any external URLs or dependencies.`;
+Now produce the summary followed by a complete, standalone HTML document inside a fenced code block labeled html. Focus heavily on creating stunning animations and visual effects that make the concepts come alive. Do not include any external URLs or dependencies.`;
 
     let experimentData;
 
@@ -399,9 +674,13 @@ Now produce the summary followed by a complete, standalone HTML document inside 
       experimentData = null;
     }
 
-    // 如果没有OpenAI数据，返回错误
+    // 如果没有OpenAI数据，直接返回错误
     if (!experimentData) {
-      throw new Error('无法生成实验：OpenAI API调用失败，且没有可用的备用数据');
+      console.log('❌ 实验生成失败：OpenAI API调用失败且无备用数据');
+      return res.status(500).json({
+        success: false,
+        error: 'OpenAI API调用失败，无法生成实验。请检查API配置或稍后重试。'
+      });
     }
 
     // 生成实验ID
@@ -439,83 +718,31 @@ Now produce the summary followed by a complete, standalone HTML document inside 
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    console.log(`🔍 获取实验详情，ID: ${id}`);
     
-    // 这里应该从数据库获取实验数据
-    // 目前返回模拟数据
-    const mockExperiment = {
-      id,
-      title: '单摆运动实验',
-      html_content: `
-        <div style="display: flex; flex-direction: column; align-items: center; padding: 20px; background: #0f0f0f; color: white; min-height: 100vh;">
-          <h2 style="margin-bottom: 30px; color: #ffffff;">单摆运动演示</h2>
-          <div style="position: relative; width: 400px; height: 400px; border: 1px solid #2a2a2a; background: #1a1a1a; border-radius: 8px;">
-            <svg width="400" height="400" style="position: absolute; top: 0; left: 0;">
-              <circle cx="200" cy="50" r="5" fill="#4a5568" />
-              <line id="pendulum-line" x1="200" y1="50" x2="200" y2="250" stroke="#718096" stroke-width="2" />
-              <circle id="pendulum-ball" cx="200" cy="250" r="15" fill="#4a5568" />
-            </svg>
-          </div>
-          <div style="margin-top: 20px; display: flex; gap: 10px; align-items: center;">
-            <button id="start-btn" style="padding: 8px 16px; background: #4a5568; color: white; border: none; border-radius: 4px; cursor: pointer;">开始</button>
-            <button id="stop-btn" style="padding: 8px 16px; background: #2d3748; color: white; border: none; border-radius: 4px; cursor: pointer;">停止</button>
-            <label style="margin-left: 20px; color: #e5e5e5;">摆长: <input id="length-slider" type="range" min="100" max="300" value="200" style="margin-left: 8px;" /></label>
-          </div>
-        </div>
-      `,
-      css_content: 'body { margin: 0; padding: 0; background: #0f0f0f; }',
-      js_content: `
-        let isRunning = false;
-        let angle = Math.PI / 4;
-        let angularVelocity = 0;
-        let length = 200;
-        const gravity = 0.5;
-        const damping = 0.995;
-        
-        function updatePendulum() {
-          if (!isRunning) return;
-          
-          const angularAcceleration = -(gravity / length) * Math.sin(angle);
-          angularVelocity += angularAcceleration;
-          angularVelocity *= damping;
-          angle += angularVelocity;
-          
-          const x = 200 + length * Math.sin(angle);
-          const y = 50 + length * Math.cos(angle);
-          
-          document.getElementById('pendulum-line').setAttribute('x2', x);
-          document.getElementById('pendulum-line').setAttribute('y2', y);
-          document.getElementById('pendulum-ball').setAttribute('cx', x);
-          document.getElementById('pendulum-ball').setAttribute('cy', y);
-          
-          requestAnimationFrame(updatePendulum);
-        }
-        
-        document.getElementById('start-btn').addEventListener('click', () => {
-          isRunning = true;
-          updatePendulum();
-        });
-        
-        document.getElementById('stop-btn').addEventListener('click', () => {
-          isRunning = false;
-        });
-        
-        document.getElementById('length-slider').addEventListener('input', (e) => {
-          length = parseInt(e.target.value);
-          if (!isRunning) {
-            const x = 200 + length * Math.sin(angle);
-            const y = 50 + length * Math.cos(angle);
-            document.getElementById('pendulum-line').setAttribute('x2', x);
-            document.getElementById('pendulum-line').setAttribute('y2', y);
-            document.getElementById('pendulum-ball').setAttribute('cx', x);
-            document.getElementById('pendulum-ball').setAttribute('cy', y);
-          }
-        });
-      `
-    };
+    // 从数据库获取实验数据
+    const experiment = await DatabaseService.getExperimentById(id);
+    
+    if (!experiment) {
+      console.log(`❌ 未找到实验，ID: ${id}`);
+      return res.status(404).json({
+        success: false,
+        error: '实验不存在'
+      });
+    }
 
+    console.log(`✅ 找到实验，ID: ${id}`);
+    
+    // 返回实验数据
     res.json({
       success: true,
-      data: mockExperiment
+      data: {
+        experiment_id: experiment.id,
+        title: experiment.title || '实验演示',
+        html_content: experiment.html_content || '',
+        css_content: '', // 从html_content中提取或留空
+        js_content: ''   // 从html_content中提取或留空
+      }
     });
 
   } catch (error) {

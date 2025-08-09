@@ -3,6 +3,7 @@ const API_BASE_URL = '/api';
 export interface ExperimentGenerateRequest {
   prompt: string;
   conversation_id?: string;
+  message_id?: string;
 }
 
 export interface ExperimentData {
@@ -90,15 +91,72 @@ class ApiClient {
   }
 
   /**
-   * 生成实验
+   * 生成实验（流式响应）
    */
-  async generateExperiment(
-    request: ExperimentGenerateRequest
-  ): Promise<ApiResponse<ExperimentData>> {
-    return this.request<ExperimentData>('/experiments/generate', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
+  async generateExperimentStream(
+    request: ExperimentGenerateRequest,
+    onChunk: (chunk: string) => void
+  ): Promise<void> {
+    console.log('🚀 开始调用流式API:', request);
+    try {
+      const response = await fetch(`${API_BASE_URL}/experiments/generate-stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      console.log('📡 收到响应:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ 响应错误:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        console.error('❌ 响应体不可读');
+        throw new Error('Response body is not readable');
+      }
+
+      console.log('📖 开始读取流式数据...');
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let chunkCount = 0;
+      
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            console.log('✅ 流式数据读取完成，总chunk数:', chunkCount);
+            break;
+          }
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.trim() && line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data !== '[DONE]') {
+                chunkCount++;
+                console.log(`📦 收到chunk ${chunkCount}:`, data.substring(0, 50) + '...');
+                onChunk(data);
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    } catch (error) {
+      console.error('流式API请求失败:', error);
+      throw error;
+    }
   }
 
   /**

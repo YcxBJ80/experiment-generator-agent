@@ -191,6 +191,32 @@ export class DatabaseService {
     }
   }
 
+  static async updateMessage(id: string, updates: Partial<Omit<Message, 'id' | 'created_at'>>): Promise<Message | null> {
+    if (!supabase) {
+      console.warn('Supabase not configured');
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating message:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Database error:', error);
+      return null;
+    }
+  }
+
   static async deleteConversation(id: string): Promise<boolean> {
     if (!supabase) {
       console.warn('Supabase not configured');
@@ -212,6 +238,42 @@ export class DatabaseService {
     } catch (error) {
       console.error('Database error:', error);
       return false;
+    }
+  }
+
+  static async getExperimentById(experimentId: string): Promise<{ id: string; title?: string; html_content?: string } | null> {
+    if (!supabase) {
+      console.warn('Supabase not configured');
+      return null;
+    }
+
+    try {
+      console.log(`Attempting to fetch experiment: ${experimentId}`);
+      const { data, error } = await supabase
+        .from('messages')
+        .select('experiment_id, html_content, content')
+        .eq('experiment_id', experimentId)
+        .not('html_content', 'is', null)
+        .single();
+
+      if (error) {
+        console.error('Error fetching experiment:', error);
+        return null;
+      }
+
+      if (!data) {
+        console.log(`No experiment found with ID: ${experimentId}`);
+        return null;
+      }
+
+      return {
+        id: data.experiment_id,
+        title: '实验演示', // 可以从content中提取标题
+        html_content: data.html_content
+      };
+    } catch (error) {
+      console.error('Database error:', error);
+      return null;
     }
   }
 }
