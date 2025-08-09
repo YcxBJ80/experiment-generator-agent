@@ -1,7 +1,7 @@
 /**
  * local server entry file, for local development
  */
-import app from './app.js';
+import app from './app';
 import { createServer } from 'http';
 
 /**

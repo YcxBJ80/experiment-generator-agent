@@ -34,7 +34,6 @@
     ]
   },
   "include": [
-    "src",
-    "api"
+    "src"
   ]
 }

@@ -4,9 +4,9 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { perplexityMCPClient } from '../lib/perplexityMcpClient.js';
-import { JavaScriptValidator } from '../lib/jsValidator.js';
-import { DatabaseService } from '../lib/supabase.js';
+import { perplexityMCPClient } from '../lib/perplexityMcpClient';
+import { JavaScriptValidator } from '../lib/jsValidator';
+import { DatabaseService } from '../lib/supabase';
 
 // 确保环境变量已加载
 const __filename = fileURLToPath(import.meta.url);
