@@ -412,7 +412,7 @@ function Home() {
 
         {/* 消息区域 */}
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 pb-32 relative">
-          {currentConversation && conversations.find(c => c.id === currentConversation) ? (
+          {!isLoading && currentConversation && conversations.find(c => c.id === currentConversation) ? (
             <div className="max-w-4xl mx-auto space-y-4">
               {/* 只在没有消息时显示大标题和Light Rays背景 */}
               {conversations.find(c => c.id === currentConversation)?.messages.length === 0 && (
@@ -421,7 +421,7 @@ function Home() {
                   <div style={{ width: '100%', height: '600px', position: 'absolute', top: 0, left: 0 }}>
                     <LightRays 
                       raysOrigin="top-center" 
-                      raysColor="#00fffff" 
+                      raysColor="#ffffff" 
                       raysSpeed={1.5} 
                       lightSpread={0.8} 
                       rayLength={1.2} 
@@ -475,20 +475,31 @@ function Home() {
                 ))}
               <div ref={messagesEndRef} />
             </div>
-          ) : (
+          ) : isLoading ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
-                <div className="text-6xl mb-4">🧪</div>
-                <h2 className="text-2xl font-bold text-dark-text mb-2">
-                  Welcome to Interactive Experiment Platform
-                </h2>
-                <p className="text-dark-text-secondary mb-6 max-w-md">
-                  Describe any experiment or concept you'd like to explore, and I'll create an interactive demo for you.
-                </p>
-                <div className="text-sm text-dark-text-secondary">
-                  Hover over the left edge to access your conversation history
-                </div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-dark-text-secondary">加载中...</p>
               </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex justify-center relative" style={{ paddingTop: 'calc(33.33vh - 2rem)' }}>
+              {/* Light Rays 背景 */}
+              <div style={{ width: '100%', height: '600px', position: 'absolute', top: 0, left: 0 }}>
+                <LightRays 
+                  raysOrigin="top-center" 
+                  raysColor="#00ffff" 
+                  raysSpeed={1.5} 
+                  lightSpread={0.8} 
+                  rayLength={1.2} 
+                  followMouse={true} 
+                  mouseInfluence={0.1} 
+                  noiseAmount={0.1} 
+                  distortion={0.05} 
+                  className="custom-rays" 
+                />
+              </div>
+              <h1 className="text-4xl font-bold text-dark-text text-center relative z-10">An Interactive Demo Agent</h1>
             </div>
           )}
           
