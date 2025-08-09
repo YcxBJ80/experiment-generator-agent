@@ -157,6 +157,7 @@ You follow this pipeline for every request:
    - ANIMATION REQUIREMENTS (CRITICAL):
      * Include smooth, continuous animations that illustrate the core concepts
      * Add particle systems where relevant (e.g., air molecules for Bernoulli's principle, electrons for circuits, atoms for chemical reactions)
+     * The components that are crucial for the demo should be is different color than the background (normally dark colors)
      * Use CSS animations, transitions, and JavaScript-driven animations extensively
      * Create visual feedback for all user interactions (hover effects, click animations, parameter changes)
      * Implement realistic physics simulations with proper timing and easing

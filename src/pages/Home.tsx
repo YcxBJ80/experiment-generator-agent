@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Send, Play, Plus, Trash2 } from 'lucide-react';
+import { MessageSquare, Send, Play, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { apiClient, type ExperimentData, type Conversation as ApiConversation, type Message as ApiMessage } from '@/lib/api';
+import LightRays from '../components/LightRays';
 
 interface Message {
   id: string;
@@ -19,7 +20,7 @@ interface Conversation {
   lastUpdated: Date;
 }
 
-export default function Home() {
+function Home() {
   const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<string>('');
@@ -29,13 +30,34 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   // 流式响应状态
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  // 滚动到底部按钮状态
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   // 加载对话历史
   useEffect(() => {
     loadConversations();
   }, []);
+
+  // 滚动监听
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowScrollToBottom(!isNearBottom && scrollHeight > clientHeight);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    // 初始检查
+    handleScroll();
+
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [currentConversation, conversations]);
 
   const loadConversations = async () => {
     try {
@@ -94,6 +116,14 @@ export default function Home() {
   };
 
   const currentConv = conversations.find(conv => conv.id === currentConversation);
+
+  // 滚动到底部函数
+  const scrollToBottom = () => {
+    messagesContainerRef.current?.scrollTo({
+      top: messagesContainerRef.current.scrollHeight,
+      behavior: 'smooth'
+    });
+  };
 
 
 
@@ -305,6 +335,10 @@ export default function Home() {
     }
   };
 
+  // 检查当前对话是否有消息
+  const hasMessages = currentConversation && 
+    conversations.find(c => c.id === currentConversation)?.messages.length > 0;
+
   return (
     <div className="h-screen bg-dark-bg flex relative">
       {/* 鼠标悬停触发区域 - 左侧1/6宽度，只在边栏关闭时显示 */}
@@ -318,8 +352,8 @@ export default function Home() {
 
       {/* 聊天历史边栏 */}
       <div 
-        className={`fixed left-0 top-0 h-full bg-dark-bg-secondary border-r border-dark-border z-20 transition-transform duration-300 ease-in-out ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed left-4 top-4 bottom-4 bg-dark-bg-secondary border border-dark-border rounded-2xl shadow-2xl z-20 transition-transform duration-300 ease-in-out overflow-y-auto sidebar-scroll ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'
         }`}
         style={{ width: '320px' }}
         onMouseLeave={() => setIsSidebarOpen(false)}
@@ -374,22 +408,33 @@ export default function Home() {
 
       {/* 主内容区域 */}
       <div className="flex-1 flex flex-col">
-        {/* 顶部标题栏 */}
-        <div className="bg-dark-bg-secondary border-b border-dark-border p-4">
-          <div className="flex items-center justify-center">
-            <h1 className="text-2xl font-bold text-dark-text">
-              🧪 Interactive Experiment Platform
-            </h1>
-          </div>
-          <p className="text-center text-dark-text-secondary mt-2">
-            Create interactive experiments with AI-powered generation
-          </p>
-        </div>
+
 
         {/* 消息区域 */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 pb-32 relative">
           {currentConversation && conversations.find(c => c.id === currentConversation) ? (
             <div className="max-w-4xl mx-auto space-y-4">
+              {/* 只在没有消息时显示大标题和Light Rays背景 */}
+              {conversations.find(c => c.id === currentConversation)?.messages.length === 0 && (
+                <div className="flex-1 flex justify-center relative" style={{ paddingTop: 'calc(33.33vh - 2rem)' }}>
+                  {/* Light Rays 背景 */}
+                  <div style={{ width: '100%', height: '600px', position: 'absolute', top: 0, left: 0 }}>
+                    <LightRays 
+                      raysOrigin="top-center" 
+                      raysColor="#00fffff" 
+                      raysSpeed={1.5} 
+                      lightSpread={0.8} 
+                      rayLength={1.2} 
+                      followMouse={true} 
+                      mouseInfluence={0.1} 
+                      noiseAmount={0.1} 
+                      distortion={0.05} 
+                      className="custom-rays" 
+                    />
+                  </div>
+                  <h1 className="text-4xl font-bold text-dark-text text-center relative z-10">An Interactive Demo Agent</h1>
+                </div>
+              )}
               {conversations
                 .find(c => c.id === currentConversation)
                 ?.messages.map((message, index) => (
@@ -424,11 +469,7 @@ export default function Home() {
                         </div>
                       )}
                       
-                      {message.timestamp && (
-                        <div className="text-xs opacity-70 mt-2">
-                          {new Date(message.timestamp).toLocaleTimeString()}
-                        </div>
-                      )}
+
                     </div>
                   </div>
                 ))}
@@ -450,12 +491,23 @@ export default function Home() {
               </div>
             </div>
           )}
+          
+          {/* 滚动到底部按钮 */}
+          {showScrollToBottom && (
+            <button
+              onClick={scrollToBottom}
+              className="fixed bottom-32 right-8 w-12 h-12 bg-primary hover:bg-primary-hover text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-20"
+              title="滚动到底部"
+            >
+              <ChevronDown className="w-6 h-6" />
+            </button>
+          )}
         </div>
 
         {/* 输入区域 */}
-        <div className="border-t border-dark-border p-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex gap-2">
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-10">
+          <div className="bg-dark-bg-secondary border border-dark-border rounded-3xl shadow-2xl p-2 max-w-4xl w-screen mx-4">
+            <div className="flex gap-1">
               <input
                 ref={inputRef}
                 type="text"
@@ -463,15 +515,15 @@ export default function Home() {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
                 placeholder="Describe the experiment you want to create..."
-                className="flex-1 px-4 py-3 bg-dark-bg-secondary border border-dark-border rounded-low text-dark-text placeholder-dark-text-secondary focus:outline-none focus:border-primary"
+                className="flex-1 px-6 py-4 bg-dark-bg border border-dark-border rounded-2xl text-dark-text placeholder-dark-text-secondary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                 disabled={isGenerating}
               />
               <button
                 onClick={handleSendMessage}
                 disabled={isGenerating || !inputMessage.trim()}
-                className="px-6 py-3 bg-primary hover:bg-primary-hover disabled:bg-dark-bg-tertiary disabled:text-dark-text-secondary text-white rounded-low transition-colors flex items-center gap-2"
+                className="px-8 py-4 bg-primary hover:bg-primary-hover disabled:bg-dark-bg-tertiary disabled:text-dark-text-secondary text-white rounded-2xl transition-all flex items-center gap-3 shadow-lg hover:shadow-xl"
               >
-                <Send className="w-4 h-4" />
+                <Send className="w-5 h-5" />
                 {isGenerating ? 'Generating...' : 'Send'}
               </button>
             </div>
@@ -480,4 +532,6 @@ export default function Home() {
       </div>
     </div>
   );
-}
+};
+
+export default Home;
