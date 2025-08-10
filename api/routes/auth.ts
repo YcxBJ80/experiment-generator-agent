@@ -1,22 +1,22 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 
 const router = express.Router();
 
 // 简单的健康检查路由
-router.get('/health', (req, res) => {
+router.get('/health', (req: Request, res: Response) => {
   res.json({ success: true, message: 'Auth service is running' });
 });
 
 // 占位符路由，未来可以添加实际的认证功能
-router.post('/login', (req, res) => {
+router.post('/login', (req: Request, res: Response) => {
   res.json({ success: false, message: 'Authentication not implemented yet' });
 });
 
-router.post('/register', (req, res) => {
+router.post('/register', (req: Request, res: Response) => {
   res.json({ success: false, message: 'Registration not implemented yet' });
 });
 
-router.post('/logout', (req, res) => {
+router.post('/logout', (req: Request, res: Response) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 

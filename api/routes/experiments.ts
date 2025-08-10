@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import { ServerResponse } from 'http';
 import { randomUUID } from 'crypto';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
@@ -104,7 +105,7 @@ interface GenerateExperimentResponse {
 /**
  * 流式生成实验demo
  */
-router.post('/generate-stream', async (req: Request, res: Response) => {
+router.post('/generate-stream', async (req: Request, res: Response & ServerResponse) => {
   console.log('🔥 流式端点被调用！');
   console.log('请求体:', req.body);
   try {

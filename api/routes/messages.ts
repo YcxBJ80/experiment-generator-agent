@@ -1,10 +1,10 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { DatabaseService } from '../lib/supabase';
 
 const router = express.Router();
 
 // Create a new message
-router.post('/', async (req, res) => {
+router.post('/', async (req: Request, res: Response) => {
   try {
     const { conversation_id, content, type, experiment_id, html_content, css_content, js_content } = req.body;
     
@@ -34,7 +34,7 @@ router.post('/', async (req, res) => {
 });
 
 // Get messages for a conversation (this is also available in conversations route)
-router.get('/conversation/:conversationId', async (req, res) => {
+router.get('/conversation/:conversationId', async (req: Request, res: Response) => {
   try {
     const { conversationId } = req.params;
     const messages = await DatabaseService.getMessages(conversationId);
@@ -46,7 +46,7 @@ router.get('/conversation/:conversationId', async (req, res) => {
 });
 
 // Update a message
-router.put('/:id', async (req, res) => {
+router.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const updates = req.body;

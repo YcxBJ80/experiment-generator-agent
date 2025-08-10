@@ -418,7 +418,7 @@ function Home() {
               {conversations.find(c => c.id === currentConversation)?.messages.length === 0 && (
                 <div className="flex-1 flex justify-center relative" style={{ paddingTop: 'calc(33.33vh - 2rem)' }}>
                   {/* Light Rays 背景 */}
-                  <div style={{ width: '100%', height: '600px', position: 'absolute', top: 0, left: 0 }}>
+                  <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1 }}>
                     <LightRays 
                       raysOrigin="top-center" 
                       raysColor="#ffffff" 
@@ -432,7 +432,7 @@ function Home() {
                       className="custom-rays" 
                     />
                   </div>
-                  <h1 className="text-4xl font-bold text-dark-text text-center relative z-10">An Interactive Demo Agent</h1>
+                  <h1 className="text-4xl font-bold text-dark-text text-center relative z-20">An Interactive Demo Agent</h1>
                 </div>
               )}
               {conversations
@@ -485,7 +485,7 @@ function Home() {
           ) : (
             <div className="flex-1 flex justify-center relative" style={{ paddingTop: 'calc(33.33vh - 2rem)' }}>
               {/* Light Rays 背景 */}
-              <div style={{ width: '100%', height: '600px', position: 'absolute', top: 0, left: 0 }}>
+              <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1 }}>
                 <LightRays 
                   raysOrigin="top-center" 
                   raysColor="#00ffff" 
@@ -499,7 +499,7 @@ function Home() {
                   className="custom-rays" 
                 />
               </div>
-              <h1 className="text-4xl font-bold text-dark-text text-center relative z-10">An Interactive Demo Agent</h1>
+              <h1 className="text-4xl font-bold text-dark-text text-center relative z-20">An Interactive Demo Agent</h1>
             </div>
           )}
           

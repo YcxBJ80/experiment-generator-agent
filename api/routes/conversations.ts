@@ -1,10 +1,10 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { DatabaseService } from '../lib/supabase';
 
 const router = express.Router();
 
 // Get all conversations
-router.get('/', async (req, res) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
     const conversations = await DatabaseService.getConversations();
     res.json(conversations);
@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create a new conversation
-router.post('/', async (req, res) => {
+router.post('/', async (req: Request, res: Response) => {
   try {
     const { title } = req.body;
     const conversation = await DatabaseService.createConversation(title);
@@ -32,7 +32,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update conversation title
-router.put('/:id', async (req, res) => {
+router.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { title } = req.body;
@@ -55,7 +55,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete a conversation
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const success = await DatabaseService.deleteConversation(id);
@@ -72,7 +72,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Get messages for a specific conversation
-router.get('/:id/messages', async (req, res) => {
+router.get('/:id/messages', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const messages = await DatabaseService.getMessages(id);
