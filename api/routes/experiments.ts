@@ -1,4 +1,5 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
+import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 import { ServerResponse } from 'http';
 import { randomUUID } from 'crypto';
 import OpenAI from 'openai';
@@ -105,7 +106,7 @@ interface GenerateExperimentResponse {
 /**
  * 流式生成实验demo
  */
-router.post('/generate-stream', async (req: Request, res: Response & ServerResponse) => {
+router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse & ServerResponse) => {
   console.log('🔥 流式端点被调用！');
   console.log('请求体:', req.body);
   try {
@@ -342,7 +343,7 @@ Now produce the summary followed by a complete, standalone HTML document inside 
 /**
  * 生成实验demo（非流式，保留兼容性）
  */
-router.post('/generate', async (req: Request, res: Response) => {
+router.post('/generate', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { prompt, conversation_id }: GenerateExperimentRequest = req.body;
 
@@ -717,7 +718,7 @@ Now produce the summary followed by a complete, standalone HTML document inside 
 /**
  * 获取实验详情
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { id } = req.params;
     console.log(`🔍 获取实验详情，ID: ${id}`);
