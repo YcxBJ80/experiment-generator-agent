@@ -340,7 +340,7 @@ function Home() {
     conversations.find(c => c.id === currentConversation)?.messages.length > 0;
 
   return (
-    <div className="h-screen bg-dark-bg flex relative">
+    <div className="h-screen flex relative" style={{ backgroundColor: '#2D3748' }}>
       {/* 鼠标悬停触发区域 - 左侧1/6宽度，只在边栏关闭时显示 */}
       {!isSidebarOpen && (
         <div 
@@ -421,7 +421,7 @@ function Home() {
                   <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1 }}>
                     <LightRays 
                       raysOrigin="top-center" 
-                      raysColor="#ffffff" 
+                      raysColor="#00ffff" 
                       raysSpeed={1.5} 
                       lightSpread={0.8} 
                       rayLength={1.2} 
@@ -432,7 +432,7 @@ function Home() {
                       className="custom-rays" 
                     />
                   </div>
-                  <h1 className="text-4xl font-bold text-dark-text text-center relative z-20">An Interactive Demo Agent</h1>
+                  <h1 className="text-4xl font-bold text-dark-text text-center relative z-20">Visualize an Experiment</h1>
                 </div>
               )}
               {conversations
@@ -499,7 +499,7 @@ function Home() {
                   className="custom-rays" 
                 />
               </div>
-              <h1 className="text-4xl font-bold text-dark-text text-center relative z-20">An Interactive Demo Agent</h1>
+              <h1 className="text-4xl font-bold text-dark-text text-center relative z-20">Visualize An Experiment</h1>
             </div>
           )}
           

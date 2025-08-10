@@ -1,74 +1,69 @@
 import express from 'express';
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
-import { DatabaseService } from '../lib/supabase';
+import { DatabaseService } from '../lib/supabase.js';
 
 const router = express.Router();
 
-// 获取所有对话
+// Get all conversations
 router.get('/', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const conversations = await DatabaseService.getConversations();
     res.json(conversations);
   } catch (error) {
+    console.error('Error fetching conversations:', error);
     res.status(500).json({ error: 'Failed to fetch conversations' });
   }
 });
 
-// 创建新对话
+// Create a new conversation
 router.post('/', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { title } = req.body;
     const conversation = await DatabaseService.createConversation(title);
+    
     if (!conversation) {
-      return res.status(400).json({ error: 'Failed to create conversation' });
+      return res.status(500).json({ error: 'Failed to create conversation' });
     }
+    
     res.status(201).json(conversation);
   } catch (error) {
+    console.error('Error creating conversation:', error);
     res.status(500).json({ error: 'Failed to create conversation' });
   }
 });
 
-// 更新对话标题
+// Get messages for a specific conversation
+router.get('/:conversationId/messages', async (req: ExpressRequest, res: ExpressResponse) => {
+  try {
+    const { conversationId } = req.params;
+    const messages = await DatabaseService.getMessages(conversationId);
+    res.json(messages);
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+// Update conversation title
 router.put('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { id } = req.params;
     const { title } = req.body;
     
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    
     const success = await DatabaseService.updateConversationTitle(id, title);
+    
     if (!success) {
-      return res.status(404).json({ error: 'Conversation not found' });
+      return res.status(500).json({ error: 'Failed to update conversation title' });
     }
     
-    res.json({ success: true });
+    res.json({ success: true, message: 'Conversation title updated' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update conversation' });
-  }
-});
-
-// 删除对话
-router.delete('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
-  try {
-    const { id } = req.params;
-    
-    const success = await DatabaseService.deleteConversation(id);
-    if (!success) {
-      return res.status(404).json({ error: 'Conversation not found' });
-    }
-    
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete conversation' });
-  }
-});
-
-// 获取特定对话的消息
-router.get('/:id/messages', async (req: ExpressRequest, res: ExpressResponse) => {
-  try {
-    const { id } = req.params;
-    
-    res.json({ messages: [] });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch messages' });
+    console.error('Error updating conversation title:', error);
+    res.status(500).json({ error: 'Failed to update conversation title' });
   }
 });
 

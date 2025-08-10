@@ -102,7 +102,7 @@ export default function Demo() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center" style={{ backgroundColor: '#E3F1FB' }}>
+      <div className="h-screen flex items-center justify-center" style={{ backgroundColor: '#2D3748' }}>
         <div className="text-gray-600">加载实验中...</div>
       </div>
     );
@@ -110,7 +110,7 @@ export default function Demo() {
 
   if (!experiment) {
     return (
-      <div className="h-screen relative" style={{ backgroundColor: '#E3F1FB' }}>
+      <div className="h-screen relative" style={{ backgroundColor: '#2D3748' }}>
         {/* 返回按钮 */}
         <button
           onClick={handleGoBack}
@@ -132,7 +132,7 @@ export default function Demo() {
   }
 
   return (
-    <div className="h-screen relative" style={{ backgroundColor: '#E3F1FB' }}>
+    <div className="h-screen relative" style={{ backgroundColor: '#2D3748' }}>
       {/* 返回按钮 */}
       <button
         onClick={handleGoBack}

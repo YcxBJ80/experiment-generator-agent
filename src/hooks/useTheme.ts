@@ -26,4 +26,4 @@ export function useTheme() {
     toggleTheme,
     isDark: theme === 'dark'
   };
-} 
+}

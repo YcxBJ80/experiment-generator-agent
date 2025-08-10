@@ -7,10 +7,10 @@ import cors from 'cors';
 import path from 'path';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
-import authRoutes from './routes/auth';
-import experimentsRoutes from './routes/experiments';
-import conversationsRoutes from './routes/conversations';
-import messagesRoutes from './routes/messages';
+import authRoutes from './routes/auth.js';
+import experimentsRoutes from './routes/experiments.js';
+import conversationsRoutes from './routes/conversations.js';
+import messagesRoutes from './routes/messages.js';
 
 // for esm mode
 const __filename = fileURLToPath(import.meta.url);
