@@ -6,9 +6,9 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { perplexityMCPClient } from '../lib/perplexityMcpClient.js';
-import { JavaScriptValidator } from '../lib/jsValidator.js';
-import { DatabaseService } from '../lib/supabase.js';
+import { perplexityMCPClient } from '../lib/perplexityMcpClient';
+import { JavaScriptValidator } from '../lib/jsValidator';
+import { DatabaseService } from '../lib/supabase';
 
 // 确保环境变量已加载
 const __filename = fileURLToPath(import.meta.url);
@@ -139,7 +139,8 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
 You follow this pipeline for every request:
 
 1. Understand User Request
-   - Interpret the user's described experiment or concept.
+   - Carefully interpret the user's described experiment or concept.
+   - Ask clarifying questions if needed to ensure full understanding of the user's goal, audience, and constraints.
 
 2. Information Gathering via Perplexity MCP
    - Use the Perplexity MCP tools to find accurate and relevant information about the experiment.
@@ -157,18 +158,16 @@ You follow this pipeline for every request:
    - Generate a self-contained HTML file with embedded JavaScript and CSS as needed.
    - ANIMATION REQUIREMENTS (CRITICAL):
      * Include smooth, continuous animations that illustrate the core concepts
-     * Add systems where relevant (e.g., air molecules for Bernoulli's principle, electrons for circuits, atoms for chemical reactions)
-     * The components that are crucial for the demo should be in different color than the background (normally dark colors)
-     * The crucial components should be highlighted and have text aside them to explain their role
+     * Add particle systems where relevant (e.g., air molecules for Bernoulli's principle, electrons for circuits, atoms for chemical reactions)
+     * The components that are crucial for the demo should be is different color than the background (normally dark colors)
      * Use CSS animations, transitions, and JavaScript-driven animations extensively
      * Create visual feedback for all user interactions (hover effects, click animations, parameter changes)
-     * Use different colors for different components
      * Implement realistic physics simulations with proper timing and easing
      * Add visual indicators like trails, paths, force vectors, field lines, or wave propagations
      * Use color changes, size variations, and movement to show state changes
      * Include loading animations and smooth transitions between different states
    
-   - EXAMPLES OF ANIMATIONS TO INCLUDE:
+   - SPECIFIC ANIMATION EXAMPLES TO IMPLEMENT:
      * For fluid dynamics: flowing particles, pressure visualization, streamlines
      * For mechanics: moving objects with trails, force vectors, energy transformations
      * For electricity: flowing electrons, field visualizations, sparks and glows
@@ -191,18 +190,6 @@ You follow this pipeline for every request:
      * Use consistent color schemes that enhance understanding
      * Include clear labels, legends, and measurement displays
    
-   - LAYOUT REQUIREMENTS (CRITICAL):
-     * MUST use a left-right layout structure with two main sections
-     * Left section (Demo Area): Should occupy approximately 2/3 of the screen width and contain the main experiment visualization/animation
-     * Right section (Control Panel): Should occupy approximately 1/3 of the screen width and contain all sliders, buttons, controls, and information displays
-     * Both sections MUST be enclosed in rounded rectangle containers with subtle borders and background colors
-     * Use CSS flexbox or grid to create the two-column layout
-     * Add appropriate spacing and padding between and within the sections
-     * The demo area should have a light background (e.g., #f8f9fa, #ffffff) with rounded corners
-     * The control panel should have a slightly different light background (e.g., #f1f3f4, #e9ecef) with rounded corners
-     * Ensure both sections are visually separated but harmoniously designed
-     * Make the layout responsive so it works well on different screen sizes
-   
    - The code should be clean, well-commented, and runnable as-is with no external dependencies.
    - Provide clear instructions for how to use the demo within the HTML.
    - IMPORTANT STYLING REQUIREMENTS:
@@ -217,7 +204,6 @@ You follow this pipeline for every request:
    - Make sure the code is correct and free of syntax errors.
 
 General Rules:
-- Always follow real-world principles when creating animations.
 - Always aim for maximum visual impact and educational value through animations.
 - Prioritize smooth, realistic animations that enhance understanding.
 - Keep accessibility and clear visualization in mind.
@@ -238,11 +224,11 @@ Now produce the summary followed by a complete, standalone HTML document inside 
     if (openai) {
       try {
         console.log('🚀 开始流式调用OpenAI API...');
-        console.log('模型:', 'openai/gpt-5');
+        console.log('模型:', 'openai/gpt-4o-mini');
         console.log('提示词长度:', prompt.length);
         
         const stream = await openai.chat.completions.create({
-          model: 'openai/gpt-5-chat',
+          model: 'openai/gpt-4o-mini',
           messages: [
             {
               role: 'system',
@@ -471,11 +457,11 @@ Now produce the summary followed by a complete, standalone HTML document inside 
         while (attempts < maxAttempts && !experimentData) {
           attempts++;
           console.log(`🚀 第${attempts}次尝试调用OpenAI API...`);
-          console.log('模型:', 'openai/gpt-5-mini');
+          console.log('模型:', 'openai/gpt-4o-mini');
           console.log('提示词长度:', prompt.length);
           
           const response = await openai.chat.completions.create({
-          model: 'openai/gpt-5-mini',
+          model: 'openai/gpt-4o-mini',
             messages: [
               {
                 role: 'system',
@@ -604,7 +590,7 @@ Now produce the summary followed by a complete, standalone HTML document inside 
                     
                     console.log('尝试让模型修复语法错误...');
                     const fixCompletion = await openai.chat.completions.create({
-                      model: 'openai/gpt-5-mini',
+                      model: 'openai/gpt-4o-mini',
                       messages: [
                         { role: 'system', content: '你是一个JavaScript代码修复专家。请修复提供的代码中的语法错误。' },
                         { role: 'user', content: fixPrompt }

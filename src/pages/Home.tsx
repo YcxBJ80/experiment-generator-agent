@@ -285,7 +285,7 @@ function Home() {
            }
          );
          
-         // 流式响应完成，更新状态并重新加载消息以获取experiment_id
+         // 流式响应完成，更新状态并获取experiment_id
          setConversations(prev => prev.map(conv => 
            conv.id === currentConversation 
              ? {
@@ -299,10 +299,36 @@ function Home() {
              : conv
          ));
          
-         // 延迟一下再重新加载消息，确保后端已经完成更新
+         // 获取更新后的消息以获取experiment_id，但不替换整个消息列表
+         setTimeout(async () => {
+           try {
+             const messagesResponse = await apiClient.getMessages(currentConversation);
+             if (messagesResponse.success && messagesResponse.data) {
+               const updatedMessage = messagesResponse.data.find(msg => msg.id === assistantMessageResponse.data.id);
+               if (updatedMessage?.experiment_id) {
+                 setConversations(prev => prev.map(conv => 
+                   conv.id === currentConversation 
+                     ? {
+                         ...conv,
+                         messages: conv.messages.map(msg => 
+                           msg.id === assistantMessageResponse.data.id 
+                             ? { ...msg, experiment_id: updatedMessage.experiment_id }
+                             : msg
+                         )
+                       }
+                     : conv
+                 ));
+               }
+             }
+           } catch (error) {
+             console.error('获取experiment_id失败:', error);
+           }
+         }, 500);
+         
+         // 滚动到底部
          setTimeout(() => {
-           loadMessagesForConversation(currentConversation);
-         }, 1000);
+           scrollToBottom();
+         }, 100);
       }
     } catch (error) {
       console.error('生成实验失败:', error);
