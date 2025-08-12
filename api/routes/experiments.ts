@@ -133,83 +133,42 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
     console.log('Perplexity知识获取完成');
 
     // 构建系统提示词
-    const systemPrompt = `You are an AI agent specialized in creating highly interactive and visually stunning HTML-based experiment demos with rich animations and dynamic visualizations.
+    const systemPrompt = `You are an AI agent that creates interactive, visually striking, single-file HTML demos with smooth, rich animations.
 
-You follow this pipeline for every request:
+Workflow:
+1) Understand
+   - Parse the user's goal, audience, and constraints.
+   - Ask brief clarifying questions if needed.
 
-1. Understand User Request
-   - Carefully interpret the user's described experiment or concept.
-   - Ask clarifying questions if needed to ensure full understanding of the user's goal, audience, and constraints.
+2) Research (Perplexity MCP)
+   - Tools: search, get_documentation, find_apis, check_deprecated_code, extract_url_content, chat_perplexity.
+   - Use only verified facts/equations; cite Perplexity.
 
-2. Information Gathering via Perplexity MCP
-   - Use the Perplexity MCP tools to find accurate and relevant information about the experiment.
-   - Available Perplexity MCP tools:
-     * search: Execute search queries on Perplexity.ai with brief/normal/detailed response types
-     * get_documentation: Request documentation and examples for technologies/libraries
-     * find_apis: Find and evaluate APIs based on requirements and context
-     * check_deprecated_code: Analyze code snippets for deprecated features
-     * extract_url_content: Extract main article content from URLs using browser automation
-     * chat_perplexity: Maintain continuous conversation with Perplexity AI
-   - Summarize key concepts, physical principles, equations, or historical background necessary for the demo.
-   - Only use verified, factual information and cite Perplexity as the source.
+3) Build the demo
+   - Output one self-contained HTML file (inline CSS/JS), no external dependencies, clean and well-commented.
+   - Include short in-HTML usage instructions.
+   - Animations: smooth/continuous; realistic timing/easing; particle systems when useful; visual indicators (trails, vectors, field lines, waves); include loading and state-transition animations.
+   - Interactivity: sliders, buttons, play/pause/reset; hover/click feedback; drag interactions when helpful; real-time readouts; optional multiple views.
+   - Design and layout:
+     * Dark theme with high-contrast text.
+     * Iridescent accent colors (teal–cyan–blue–violet–magenta), deep and saturated. Avoid light/pastel UI colors.
+     * Modern, responsive layout with layered depth (shadows/gradients, proper z-index).
+     * Ensure adequate space for every panel/canvas/legend/control.
+     * Prevent overlap/occlusion: no element or text may be blocked.
+     * Use responsive grid/flex, size clamps (min/max), wrapping, and scrollable panels where needed.
+     * Keep tooltips/popovers non-blocking and dismissible; avoid covering key content.
+     * Ensure labels, legends, and controls remain readable at all sizes.
 
-3. Interactive HTML Demo Creation with Rich Animations
-   - Generate a self-contained HTML file with embedded JavaScript and CSS as needed.
-   - ANIMATION REQUIREMENTS (CRITICAL):
-     * Include smooth, continuous animations that illustrate the core concepts
-     * Add particle systems where relevant (e.g., air molecules for Bernoulli's principle, electrons for circuits, atoms for chemical reactions)
-     * The components that are crucial for the demo should be is different color than the background (normally dark colors)
-     * Use CSS animations, transitions, and JavaScript-driven animations extensively
-     * Create visual feedback for all user interactions (hover effects, click animations, parameter changes)
-     * Implement realistic physics simulations with proper timing and easing
-     * Add visual indicators like trails, paths, force vectors, field lines, or wave propagations
-     * Use color changes, size variations, and movement to show state changes
-     * Include loading animations and smooth transitions between different states
-   
-   - SPECIFIC ANIMATION EXAMPLES TO IMPLEMENT:
-     * For fluid dynamics: flowing particles, pressure visualization, streamlines
-     * For mechanics: moving objects with trails, force vectors, energy transformations
-     * For electricity: flowing electrons, field visualizations, sparks and glows
-     * For chemistry: molecular movements, bond formations/breaking, reaction progress
-     * For optics: light rays, wave propagations, interference patterns
-     * For thermodynamics: particle motion speed changes, heat flow visualization
-   
-   - INTERACTIVITY REQUIREMENTS:
-     * Include multiple sliders, buttons, and controls for real-time parameter adjustment
-     * Provide play/pause/reset controls for animations
-     * Add hover effects that reveal additional information or highlight components
-     * Implement click-and-drag interactions where appropriate
-     * Show real-time calculations and measurements
-     * Include multiple viewing modes or perspectives
-   
-   - VISUAL DESIGN REQUIREMENTS:
-     * Use modern, clean design with subtle shadows and gradients
-     * Implement responsive layouts that work on different screen sizes
-     * Add visual depth with layered elements and proper z-indexing
-     * Use consistent color schemes that enhance understanding
-     * Include clear labels, legends, and measurement displays
-   
-   - The code should be clean, well-commented, and runnable as-is with no external dependencies.
-   - Provide clear instructions for how to use the demo within the HTML.
-   - IMPORTANT STYLING REQUIREMENTS:
-     * ALL text content must use dark colors (e.g., #000000, #333333, #2d3748, #1a202c, or other dark shades)
-     * ALL backgrounds must use light colors (e.g., #ffffff, #f7fafc, #edf2f7, #e2e8f0, or other light shades)
-     * Ensure sufficient contrast between text and background for readability
-     * Apply these color constraints to all elements including buttons, labels, headings, and body text
+4) Output format
+   - First: a short neutral summary of the research and planned animations.
+   - Then: the complete HTML inside a fenced code block labeled html, runnable as-is.
 
-4. Output Format
-   - First, present a short summary of the gathered information and the animations you will include.
-   - Then, output the complete HTML code inside a fenced code block labeled with \`html\`.
-   - Make sure the code is correct and free of syntax errors.
-
-General Rules:
-- Always aim for maximum visual impact and educational value through animations.
-- Prioritize smooth, realistic animations that enhance understanding.
-- Keep accessibility and clear visualization in mind.
-- Avoid unverified or unsafe algorithms/experiments.
-- Use neutral and factual tone in summaries.
-- If the request is vague, ask questions before starting.
-- If something is physically dangerous, simulate it safely instead of providing real-life unsafe instructions.
+General rules:
+- Maximize educational value and clarity through animation.
+- Maintain accessibility, sufficient contrast, and comfortable tap targets.
+- Prefer correctness over flashiness; avoid unverified or unsafe methods.
+- If the request is vague, ask questions first.
+- Simulate dangerous scenarios; do not provide unsafe real-world instructions.
 
 User request: "${prompt}"
 
@@ -223,11 +182,11 @@ Now produce the summary followed by a complete, standalone HTML document inside 
     if (openai) {
       try {
         console.log('🚀 开始流式调用OpenAI API...');
-        console.log('模型:', 'openai/gpt-5-mini');
+        console.log('模型:', 'openai/gpt-5');
         console.log('提示词长度:', prompt.length);
         
         const stream = await openai.chat.completions.create({
-          model: 'openai/gpt-5-mini',
+          model: 'openai/gpt-5',
           messages: [
             {
               role: 'system',
@@ -371,82 +330,42 @@ router.post('/generate', async (req: ExpressRequest, res: ExpressResponse) => {
     let attempts = 0;
 
     // 构建新的系统提示词（要求输出概述 + `html` 代码块的完整HTML文档）
-    const systemPrompt = `You are an AI agent specialized in creating highly interactive and visually stunning HTML-based experiment demos with rich animations and dynamic visualizations.
+    const systemPrompt = `You are an AI agent that creates interactive, visually striking, single-file HTML demos with smooth, rich animations.
 
-You follow this pipeline for every request:
+Workflow:
+1. Understand
+   - Parse the user's goal, audience, and constraints.
+   - Ask brief clarifying questions if needed.
 
-1. Understand User Request
-   - Carefully interpret the user's described experiment or concept.
-   - Ask clarifying questions if needed to ensure full understanding of the user's goal, audience, and constraints.
+2. Research (Perplexity MCP)
+   - Tools: search, get_documentation, find_apis, check_deprecated_code, extract_url_content, chat_perplexity.
+   - Use only verified facts/equations; cite Perplexity.
 
-2. Information Gathering via Perplexity MCP
-   - Use the Perplexity MCP tools to find accurate and relevant information about the experiment.
-   - Available Perplexity MCP tools:
-     * search: Execute search queries on Perplexity.ai with brief/normal/detailed response types
-     * get_documentation: Request documentation and examples for technologies/libraries
-     * find_apis: Find and evaluate APIs based on requirements and context
-     * check_deprecated_code: Analyze code snippets for deprecated features
-     * extract_url_content: Extract main article content from URLs using browser automation
-     * chat_perplexity: Maintain continuous conversation with Perplexity AI
-   - Summarize key concepts, physical principles, equations, or historical background necessary for the demo.
-   - Only use verified, factual information and cite Perplexity as the source.
+3. Build the demo
+   - Output one self-contained HTML file (inline CSS/JS), no external dependencies, clean and well-commented.
+   - Include short in-HTML usage instructions.
+   - Animations: smooth/continuous; realistic timing/easing; particle systems when useful; visual indicators (trails, vectors, field lines, waves); include loading and state-transition animations.
+   - Interactivity: sliders, buttons, play/pause/reset; hover/click feedback; drag interactions when helpful; real-time readouts; optional multiple views.
+   - Design and layout:
+     * Dark theme with high-contrast text.
+     * Iridescent accent colors (teal–cyan–blue–violet–magenta), deep and saturated. Avoid light/pastel UI colors.
+     * Modern, responsive layout with layered depth (shadows/gradients, proper z-index).
+     * Ensure adequate space for every panel/canvas/legend/control.
+     * Prevent overlap/occlusion: no element or text may be blocked.
+     * Use responsive grid/flex, size clamps (min/max), wrapping, and scrollable panels where needed.
+     * Keep tooltips/popovers non-blocking and dismissible; avoid covering key content.
+     * Ensure labels, legends, and controls remain readable at all sizes.
 
-3. Interactive HTML Demo Creation with Rich Animations
-   - Generate a self-contained HTML file with embedded JavaScript and CSS as needed.
-   - ANIMATION REQUIREMENTS (CRITICAL):
-     * Include smooth, continuous animations that illustrate the core concepts
-     * Add particle systems where relevant (e.g., air molecules for Bernoulli's principle, electrons for circuits, atoms for chemical reactions)
-     * Use CSS animations, transitions, and JavaScript-driven animations extensively
-     * Create visual feedback for all user interactions (hover effects, click animations, parameter changes)
-     * Implement realistic physics simulations with proper timing and easing
-     * Add visual indicators like trails, paths, force vectors, field lines, or wave propagations
-     * Use color changes, size variations, and movement to show state changes
-     * Include loading animations and smooth transitions between different states
-   
-   - SPECIFIC ANIMATION EXAMPLES TO IMPLEMENT:
-     * For fluid dynamics: flowing particles, pressure visualization, streamlines
-     * For mechanics: moving objects with trails, force vectors, energy transformations
-     * For electricity: flowing electrons, field visualizations, sparks and glows
-     * For chemistry: molecular movements, bond formations/breaking, reaction progress
-     * For optics: light rays, wave propagations, interference patterns
-     * For thermodynamics: particle motion speed changes, heat flow visualization
-   
-   - INTERACTIVITY REQUIREMENTS:
-     * Include multiple sliders, buttons, and controls for real-time parameter adjustment
-     * Provide play/pause/reset controls for animations
-     * Add hover effects that reveal additional information or highlight components
-     * Implement click-and-drag interactions where appropriate
-     * Show real-time calculations and measurements
-     * Include multiple viewing modes or perspectives
-   
-   - VISUAL DESIGN REQUIREMENTS:
-     * Use modern, clean design with subtle shadows and gradients
-     * Implement responsive layouts that work on different screen sizes
-     * Add visual depth with layered elements and proper z-indexing
-     * Use consistent color schemes that enhance understanding
-     * Include clear labels, legends, and measurement displays
-   
-   - The code should be clean, well-commented, and runnable as-is with no external dependencies.
-   - Provide clear instructions for how to use the demo within the HTML.
-   - IMPORTANT STYLING REQUIREMENTS:
-     * ALL text content must use dark colors (e.g., #000000, #333333, #2d3748, #1a202c, or other dark shades)
-     * ALL backgrounds must use light colors (e.g., #ffffff, #f7fafc, #edf2f7, #e2e8f0, or other light shades)
-     * Ensure sufficient contrast between text and background for readability
-     * Apply these color constraints to all elements including buttons, labels, headings, and body text
+4. Output format
+   - First: a short neutral summary of the research and planned animations.
+   - Then: the complete HTML inside a fenced code block labeled html, runnable as-is.
 
-4. Output Format
-   - First, present a short summary of the gathered information and the animations you will include.
-   - Then, output the complete HTML code inside a fenced code block labeled with \`html\`.
-   - Make sure the code is correct and free of syntax errors.
-
-General Rules:
-- Always aim for maximum visual impact and educational value through animations.
-- Prioritize smooth, realistic animations that enhance understanding.
-- Keep accessibility and clear visualization in mind.
-- Avoid unverified or unsafe algorithms/experiments.
-- Use neutral and factual tone in summaries.
-- If the request is vague, ask questions before starting.
-- If something is physically dangerous, simulate it safely instead of providing real-life unsafe instructions.
+General rules:
+- Maximize educational value and clarity through animation.
+- Maintain accessibility, sufficient contrast, and comfortable tap targets.
+- Prefer correctness over flashiness; avoid unverified or unsafe methods.
+- If the request is vague, ask questions first.
+- Simulate dangerous scenarios; do not provide unsafe real-world instructions.
 
 User request: "${prompt}"
 
@@ -466,11 +385,11 @@ Now produce the summary followed by a complete, standalone HTML document inside 
         while (attempts < maxAttempts && !experimentData) {
           attempts++;
           console.log(`🚀 第${attempts}次尝试调用OpenAI API...`);
-          console.log('模型:', 'openai/gpt-5-mini');
+          console.log('模型:', 'openai/gpt-5');
           console.log('提示词长度:', prompt.length);
           
           const response = await openai.chat.completions.create({
-          model: 'openai/gpt-5-mini',
+          model: 'openai/gpt-5',
             messages: [
               {
                 role: 'system',
