@@ -1,152 +1,242 @@
-# 🚀 Interactive Experiment Platform with Perplexity MCP Integration
+# 🚀 AI Interactive Experiment Platform
 
-> A cutting-edge hackathon project showcasing AI-powered experiment generation with real-time knowledge integration
+> An AI-powered interactive experiment generation platform with Perplexity MCP integration for real-time knowledge retrieval and intelligent code generation
 
-## ✨ Features
+## 📖 Project Overview
 
-### 🧠 AI-Powered Experiment Generation
-- **OpenAI GPT-5-mini Integration**: Advanced AI model for generating interactive experiments
-- **Perplexity MCP Integration**: Real-time knowledge retrieval for accurate, up-to-date information
-- **Intelligent Code Generation**: Automatic HTML, CSS, and JavaScript code generation
+This is an innovative AI-driven platform that allows users to generate interactive HTML/CSS/JavaScript experiments through natural language descriptions. The platform integrates OpenAI GPT models and Perplexity MCP client to retrieve real-time knowledge and generate high-quality interactive content.
 
-### 🔧 Advanced Code Quality Assurance
-- **Automatic JavaScript Validation**: Real-time syntax checking and error detection
-- **Smart Code Repair**: AI-powered automatic code fixing with 8000 token capacity
-- **HTML Tag Sanitization**: Automatic cleanup of malformed HTML structures
-- **Comprehensive Testing**: 100% test success rate with detailed validation
+### 🎯 Core Features
 
-### 🎯 Modern Tech Stack
-- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
-- **Backend**: Express.js + TypeScript + Node.js
-- **Database**: Supabase integration for data persistence
-- **AI Integration**: OpenAI API + Perplexity MCP client
-- **Development**: Hot reload, ESLint, comprehensive testing suite
+- **Intelligent Conversation Generation**: Natural language interaction powered by OpenAI GPT
+- **Real-time Knowledge Retrieval**: Integrated Perplexity MCP protocol for latest information
+- **Interactive Experiment Generation**: Automatically generates runnable HTML/CSS/JavaScript code
+- **Code Quality Assurance**: Automatic JavaScript syntax validation and repair
+- **Streaming Response**: Real-time display of generation process for enhanced user experience
 
-## 🏗️ Architecture
+## 🛠️ Technology Stack
 
-### MCP (Model Context Protocol) Integration
+### Frontend Technologies
+- **React 18** - Modern frontend framework
+- **TypeScript** - Type-safe JavaScript
+- **Vite** - Fast build tool
+- **Tailwind CSS** - Utility-first CSS framework
+- **Lucide React** - Modern icon library
+- **React Router DOM** - Client-side routing
+- **Zustand** - Lightweight state management
+
+### Backend Technologies
+- **Node.js** - JavaScript runtime
+- **Express.js** - Web application framework
+- **TypeScript** - Server-side type safety
+- **Nodemon** - Auto-restart during development
+- **CORS** - Cross-origin resource sharing
+
+### Database & Storage
+- **Supabase** - Open-source Firebase alternative
+- **PostgreSQL** - Relational database (via Supabase)
+
+### AI Integration
+- **OpenAI API** - GPT model integration
+- **Model Context Protocol (MCP)** - AI model context protocol
+- **Perplexity MCP Client** - Real-time knowledge retrieval
+
+### Development Tools
+- **ESLint** - Code quality checking
+- **Concurrently** - Run multiple commands in parallel
+- **Zod** - Runtime type validation
+
+## 🏗️ System Architecture
+
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Frontend      │    │   Backend API    │    │  Perplexity     │
-│   React + TS    │◄──►│   Express.js     │◄──►│  MCP Client     │
+│   React Frontend│    │   Express Backend│    │  Perplexity     │
+│   TypeScript    │◄──►│   TypeScript     │◄──►│  MCP Client     │
+│   Tailwind CSS │    │   Node.js        │    │  Knowledge API  │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                                 │
                                 ▼
                        ┌──────────────────┐
                        │   OpenAI API     │
-                       │   GPT-5-mini     │
+                       │   GPT Models     │
+                       └──────────────────┘
+                                │
+                                ▼
+                       ┌──────────────────┐
+                       │   Supabase       │
+                       │   PostgreSQL     │
                        └──────────────────┘
 ```
-
-### Key Components
-- **Perplexity MCP Client**: 6 specialized tools for knowledge retrieval
-- **JavaScript Validator**: Advanced syntax checking and auto-repair
-- **Experiment Generator**: AI-powered interactive content creation
-- **Code Sanitizer**: HTML/CSS/JS cleanup and optimization
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+
-- pnpm (recommended) or npm
-- Supabase account
-- OpenAI API key
-- Perplexity API access
 
-### Installation
+- **Node.js** 18.0 or higher
+- **pnpm** (recommended) or npm
+- **Supabase** account
+- **OpenAI API** key
+
+### Installation Steps
 
 1. **Clone the repository**
 ```bash
-git clone <your-repo-url>
-cd hackathone2-perplexity-mcp
+git clone https://github.com/your-username/hackathone2.git
+cd hackathone2
 ```
 
 2. **Install dependencies**
 ```bash
+# Using pnpm (recommended)
 pnpm install
+
+# Or using npm
+npm install
 ```
 
-3. **Environment Setup**
+3. **Environment setup**
 ```bash
+# Copy environment template
 cp .env.example .env
-# Edit .env with your API keys
+
+# Edit .env file with your API keys
 ```
 
-4. **Database Setup**
-```bash
-# Run Supabase migrations
-npx supabase db push
+**Environment variables explanation:**
+```env
+# OpenRouter API Configuration
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+
+# Server Configuration
+PORT=8769
+
+# Supabase Configuration
+SUPABASE_URL=your_supabase_url_here
+SUPABASE_ANON_KEY=your_supabase_anon_key_here
 ```
 
-5. **Start Development Servers**
+4. **Database setup**
+
+Run the following SQL scripts in your Supabase console:
+
+```sql
+-- Create conversations table
+CREATE TABLE conversations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create messages table
+CREATE TABLE messages (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  experiment_id UUID,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+5. **Start development servers**
 ```bash
 # Start both frontend and backend
 pnpm dev
 
 # Or start separately
-pnpm client:dev  # Frontend on http://localhost:5173
-pnpm server:dev  # Backend on http://localhost:8767
+pnpm client:dev  # Frontend: http://localhost:5173
+pnpm server:dev  # Backend: http://localhost:8769
 ```
 
-## 🧪 Testing
+## 📱 Usage Guide
 
-### Comprehensive Test Suite
-```bash
-# Run experiment generation tests
-node detailed_experiment_test.js
+### Basic Usage Flow
 
-# Run comprehensive system tests
-node comprehensive_system_test.js
+1. **Access the app**: Open your browser and visit `http://localhost:5173`
+2. **Start conversation**: Describe the experiment or functionality you want in the input box
+3. **View generation**: AI will generate responses and interactive experiments in real-time
+4. **Experience experiments**: Click the "View Interactive Demo" button to experience generated experiments
+5. **Continue conversation**: You can continue asking questions or request modifications
 
-# Run API tests
-node test_experiment_api.js
+### Example Prompts
+
 ```
+Create a simple calculator with basic arithmetic operations
 
-### Test Results
-- ✅ **100% Success Rate**: All test cases pass
-- ✅ **Code Quality**: JavaScript validation and auto-repair
-- ✅ **Knowledge Integration**: Perplexity AI properly cited
-- ✅ **Error Handling**: Robust error recovery mechanisms
+Make a colorful particle animation effect
 
-## 📊 Performance Highlights
+Create a todo list that can add, delete, and mark items as complete
 
-- **Token Optimization**: 8000 token limit for complex code generation
-- **Auto-Repair Success**: 95%+ code fix success rate
-- **Response Time**: <3s average experiment generation
-- **Knowledge Accuracy**: Real-time Perplexity integration
+Design a responsive card layout showcase
+```
 
 ## 🔧 API Endpoints
 
-### Experiments
-- `POST /api/experiments/generate` - Generate new experiment
+### Conversation Management
+- `POST /api/conversations` - Create new conversation
+- `GET /api/conversations/:id/messages` - Get conversation messages
+
+### Message Processing
+- `POST /api/messages` - Send message (supports streaming response)
+- `GET /api/messages/:id` - Get specific message
+
+### Experiment Management
+- `POST /api/experiments/generate` - Generate experiment
 - `GET /api/experiments/:id` - Get experiment details
 
-### Messages & Conversations
-- `POST /api/conversations` - Create conversation
-- `POST /api/messages` - Send message
-- `GET /api/conversations/:id/messages` - Get conversation history
+## 🧪 Development & Testing
 
-## 🎯 Hackathon Achievements
+### Code Quality Checks
+```bash
+# TypeScript type checking
+pnpm check
 
-### Technical Innovation
-- ✨ **First-class MCP Integration**: Pioneering use of Model Context Protocol
-- 🧠 **AI-Powered Code Repair**: Advanced syntax validation and auto-fixing
-- 🔄 **Real-time Knowledge**: Live Perplexity integration for accurate information
-- 🎨 **Interactive Experiments**: Dynamic HTML/CSS/JS generation
+# ESLint code quality check
+pnpm lint
+```
 
-### Code Quality
-- 📝 **TypeScript Throughout**: Full type safety
-- 🧪 **Comprehensive Testing**: 100% test coverage
-- 🔍 **Advanced Validation**: Multi-layer code quality checks
-- 🚀 **Performance Optimized**: Efficient token usage and caching
+### Build Project
+```bash
+# Build production version
+pnpm build
+
+# Preview build result
+pnpm preview
+```
+
+## 📦 Deployment
+
+### Vercel Deployment
+
+1. **Install Vercel CLI**
+```bash
+npm i -g vercel
+```
+
+2. **Deploy to Vercel**
+```bash
+vercel --prod
+```
+
+3. **Configure environment variables**
+Set the same environment variables in the Vercel console.
+
+### Other Deployment Platforms
+
+The project supports deployment to any Node.js-compatible platform, such as:
+- **Netlify**
+- **Railway**
+- **Render**
+- **Heroku**
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+5. Create a Pull Request
 
 ## 📄 License
 
@@ -154,11 +244,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- **OpenAI** for GPT-5-mini API
-- **Perplexity AI** for knowledge integration
-- **Supabase** for database infrastructure
-- **Vercel** for deployment platform
+- **OpenAI** - For providing powerful GPT models
+- **Perplexity AI** - For real-time knowledge retrieval services
+- **Supabase** - For modern database solutions
+- **Vercel** - For excellent deployment platform
 
 ---
 
-**Built with ❤️ for the hackathon - showcasing the future of AI-powered interactive content generation!**
+**Built with ❤️ - Showcasing the future of AI-driven interactive content generation!**

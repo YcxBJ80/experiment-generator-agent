@@ -262,6 +262,7 @@ function Home() {
         setStreamingMessageId(assistantMessageResponse.data.id);
         
         // 调用流式API生成实验
+        let hasStartedExperimentIdCheck = false;
          await apiClient.generateExperimentStream(
            {
              prompt: messageContent,
@@ -282,10 +283,57 @@ function Home() {
                    }
                  : conv
              ));
+             
+             // 当检测到HTML代码块开始时，开始检查experiment_id
+             if (!hasStartedExperimentIdCheck && chunk.includes('```html')) {
+               hasStartedExperimentIdCheck = true;
+               console.log('🔧 检测到HTML代码块，开始检查experiment_id');
+               
+               // 延迟一点时间让后端有机会设置experiment_id
+               setTimeout(() => {
+                 const checkExperimentIdDuringStream = async (attempt = 1, maxAttempts = 5) => {
+                   try {
+                     console.log(`流式响应中检查experiment_id，第${attempt}次尝试`);
+                     const messagesResponse = await apiClient.getMessages(currentConversation);
+                     if (messagesResponse.success && messagesResponse.data) {
+                       const updatedMessage = messagesResponse.data.find(msg => msg.id === assistantMessageResponse.data.id);
+                       if (updatedMessage?.experiment_id) {
+                         console.log('✅ 流式响应中获取到experiment_id:', updatedMessage.experiment_id);
+                         setConversations(prev => prev.map(conv => 
+                           conv.id === currentConversation 
+                             ? {
+                                 ...conv,
+                                 messages: conv.messages.map(msg => 
+                                   msg.id === assistantMessageResponse.data.id 
+                                     ? { ...msg, experiment_id: updatedMessage.experiment_id }
+                                     : msg
+                                 )
+                               }
+                             : conv
+                         ));
+                         return; // 成功获取，停止重试
+                       }
+                     }
+                     
+                     // 继续重试
+                     if (attempt < maxAttempts) {
+                       setTimeout(() => checkExperimentIdDuringStream(attempt + 1, maxAttempts), 2000);
+                     }
+                   } catch (error) {
+                     console.error('流式响应中获取experiment_id失败:', error);
+                     if (attempt < maxAttempts) {
+                       setTimeout(() => checkExperimentIdDuringStream(attempt + 1, maxAttempts), 2000);
+                     }
+                   }
+                 };
+                 
+                 checkExperimentIdDuringStream();
+               }, 1000);
+             }
            }
          );
          
-         // 流式响应完成，更新状态并获取experiment_id
+         // 流式响应完成，更新状态
          setConversations(prev => prev.map(conv => 
            conv.id === currentConversation 
              ? {
@@ -299,13 +347,18 @@ function Home() {
              : conv
          ));
          
-         // 获取更新后的消息以获取experiment_id，但不替换整个消息列表
-         setTimeout(async () => {
+         // 清除流式响应状态
+         setStreamingMessageId(null);
+         
+         // 立即检查一次experiment_id，然后定期检查直到获取到为止
+         const checkExperimentId = async (attempt = 1, maxAttempts = 10) => {
            try {
+             console.log(`检查experiment_id，第${attempt}次尝试`);
              const messagesResponse = await apiClient.getMessages(currentConversation);
              if (messagesResponse.success && messagesResponse.data) {
                const updatedMessage = messagesResponse.data.find(msg => msg.id === assistantMessageResponse.data.id);
                if (updatedMessage?.experiment_id) {
+                 console.log('✅ 获取到experiment_id:', updatedMessage.experiment_id);
                  setConversations(prev => prev.map(conv => 
                    conv.id === currentConversation 
                      ? {
@@ -318,12 +371,27 @@ function Home() {
                        }
                      : conv
                  ));
+                 return; // 成功获取，停止重试
                }
+             }
+             
+             // 如果还没有获取到experiment_id且还有重试次数，继续尝试
+             if (attempt < maxAttempts) {
+               setTimeout(() => checkExperimentId(attempt + 1, maxAttempts), 1000);
+             } else {
+               console.warn('⚠️ 达到最大重试次数，仍未获取到experiment_id');
              }
            } catch (error) {
              console.error('获取experiment_id失败:', error);
+             // 即使出错也继续重试
+             if (attempt < maxAttempts) {
+               setTimeout(() => checkExperimentId(attempt + 1, maxAttempts), 1000);
+             }
            }
-         }, 500);
+         };
+         
+         // 立即开始检查
+         checkExperimentId();
          
          // 滚动到底部
          setTimeout(() => {
@@ -367,7 +435,7 @@ function Home() {
 
   return (
     <div className="h-screen flex relative" style={{ backgroundColor: '#2D3748' }}>
-      {/* 鼠标悬停触发区域 - 左侧1/6宽度，只在边栏关闭时显示 */}
+      {/* 鼠标悬停触发区域 - 左侧1/7宽度，只在边栏关闭时显示 */}
       {!isSidebarOpen && (
         <div 
           className="fixed left-0 top-0 h-full z-30"
@@ -376,12 +444,12 @@ function Home() {
         />
       )}
 
-      {/* 聊天历史边栏 */}
+      {/* 聊天历史边栏 - 使用1/7的屏幕宽度 */}
       <div 
         className={`fixed left-4 top-4 bottom-4 bg-dark-bg-secondary border border-dark-border rounded-2xl shadow-2xl z-20 transition-transform duration-300 ease-in-out overflow-y-auto sidebar-scroll ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'
         }`}
-        style={{ width: '320px' }}
+        style={{ width: 'calc((100vw / 5) - 2rem)' }}
         onMouseLeave={() => setIsSidebarOpen(false)}
       >
         <div className="p-4 border-b border-dark-border">
@@ -542,8 +610,8 @@ function Home() {
         </div>
 
         {/* 输入区域 */}
-        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-10">
-          <div className="bg-dark-bg-secondary border border-dark-border rounded-3xl shadow-2xl p-2 max-w-4xl w-screen mx-4">
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-10 w-3/5">
+          <div className="bg-dark-bg-secondary border border-dark-border rounded-3xl shadow-2xl p-2 w-full">
             <div className="flex gap-1">
               <input
                 ref={inputRef}
@@ -552,13 +620,13 @@ function Home() {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
                 placeholder="Describe the experiment you want to create..."
-                className="flex-1 px-6 py-4 bg-dark-bg border border-dark-border rounded-2xl text-dark-text placeholder-dark-text-secondary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                className="flex-1 px-6 py-2 bg-dark-bg border border-dark-border rounded-2xl text-dark-text placeholder-dark-text-secondary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                 disabled={isGenerating}
               />
               <button
                 onClick={handleSendMessage}
                 disabled={isGenerating || !inputMessage.trim()}
-                className="px-8 py-4 bg-primary hover:bg-primary-hover disabled:bg-dark-bg-tertiary disabled:text-dark-text-secondary text-white rounded-2xl transition-all flex items-center gap-3 shadow-lg hover:shadow-xl"
+                className="px-6 py-2 bg-primary hover:bg-primary-hover disabled:bg-dark-bg-tertiary disabled:text-dark-text-secondary text-white rounded-2xl transition-all flex items-center gap-2 shadow-lg hover:shadow-xl"
               >
                 <Send className="w-5 h-5" />
                 {isGenerating ? 'Generating...' : 'Send'}

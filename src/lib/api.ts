@@ -62,11 +62,29 @@ class ApiClient {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        return {
-          success: false,
-          error: errorData.error || `HTTP ${response.status}: ${response.statusText}`,
-        };
+        try {
+          // 先读取响应文本
+          const responseText = await response.text();
+          try {
+            // 尝试解析为JSON
+            const errorData = JSON.parse(responseText);
+            return {
+              success: false,
+              error: errorData.error || `HTTP ${response.status}: ${response.statusText}`,
+            };
+          } catch (jsonError) {
+            // 如果不是JSON格式，直接使用响应文本
+            return {
+              success: false,
+              error: `HTTP ${response.status}: ${responseText || response.statusText}`,
+            };
+          }
+        } catch (textError) {
+          return {
+            success: false,
+            error: `HTTP ${response.status}: ${response.statusText}`,
+          };
+        }
       }
 
       const data = await response.json();

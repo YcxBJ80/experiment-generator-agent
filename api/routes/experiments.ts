@@ -1,14 +1,13 @@
-import express from 'express';
-import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
+import express, { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 import { ServerResponse } from 'http';
 import { randomUUID } from 'crypto';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { perplexityMCPClient } from '../lib/perplexityMcpClient';
-import { JavaScriptValidator } from '../lib/jsValidator';
-import { DatabaseService } from '../lib/supabase';
+import { perplexityMCPClient } from '../lib/perplexityMcpClient.js';
+import { JavaScriptValidator } from '../lib/jsValidator.js';
+import { DatabaseService } from '../lib/supabase.js';
 
 // 确保环境变量已加载
 const __filename = fileURLToPath(import.meta.url);
@@ -106,7 +105,7 @@ interface GenerateExperimentResponse {
 /**
  * 流式生成实验demo
  */
-router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse & ServerResponse) => {
+router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse) => {
   console.log('🔥 流式端点被调用！');
   console.log('请求体:', req.body);
   try {
@@ -224,11 +223,11 @@ Now produce the summary followed by a complete, standalone HTML document inside 
     if (openai) {
       try {
         console.log('🚀 开始流式调用OpenAI API...');
-        console.log('模型:', 'openai/gpt-4o-mini');
+        console.log('模型:', 'openai/gpt-5-mini');
         console.log('提示词长度:', prompt.length);
         
         const stream = await openai.chat.completions.create({
-          model: 'openai/gpt-4o-mini',
+          model: 'openai/gpt-5-mini',
           messages: [
             {
               role: 'system',
@@ -246,6 +245,8 @@ Now produce the summary followed by a complete, standalone HTML document inside 
 
         let fullContent = '';
         let chunkCount = 0;
+        let experiment_id: string | null = null;
+        let hasUpdatedExperimentId = false;
         
         for await (const chunk of stream) {
           if (chunk.choices && chunk.choices[0] && chunk.choices[0].delta && chunk.choices[0].delta.content) {
@@ -255,6 +256,25 @@ Now produce the summary followed by a complete, standalone HTML document inside 
             
             // 发送SSE格式的流式数据到前端
             res.write(`data: ${content}\n\n`);
+            
+            // 检查是否已经有足够的内容来判断这是一个实验生成请求
+            // 当检测到HTML代码块开始时，立即生成experiment_id并更新消息
+            if (!hasUpdatedExperimentId && message_id && fullContent.includes('```html')) {
+              try {
+                experiment_id = randomUUID();
+                console.log('🔧 检测到HTML代码块，立即设置experiment_id:', experiment_id);
+                
+                // 立即更新消息，添加experiment_id（内容稍后更新）
+                await DatabaseService.updateMessage(message_id, {
+                  experiment_id: experiment_id
+                });
+                
+                hasUpdatedExperimentId = true;
+                console.log('✅ experiment_id已提前设置，前端可以立即显示按钮');
+              } catch (error) {
+                console.error('❌ 提前设置experiment_id时出错:', error);
+              }
+            }
             
             if (chunkCount % 10 === 0) {
               console.log(`📦 已发送 ${chunkCount} 个chunks，当前长度: ${fullContent.length}`);
@@ -268,53 +288,42 @@ Now produce the summary followed by a complete, standalone HTML document inside 
         
         console.log('✅ 流式响应完成，总chunks:', chunkCount, '总长度:', fullContent.length);
         
-        // 在流式响应完成后，创建实验记录并更新消息
+        // 在流式响应完成后，更新完整内容和HTML内容
         if (fullContent && message_id) {
           try {
-            console.log('🔧 开始处理实验数据和更新消息...');
+            console.log('🔧 开始更新完整消息内容...');
             
             // 解析生成的内容，提取HTML代码块
             const htmlMatch = fullContent.match(/```html\s*([\s\S]*?)\s*```/);
             if (htmlMatch) {
               const htmlContent = htmlMatch[1].trim();
               
-              // 生成实验ID
-              const experiment_id = randomUUID();
+              // 如果之前没有设置experiment_id（备用方案）
+              if (!experiment_id) {
+                experiment_id = randomUUID();
+                console.log('🔧 备用方案：设置experiment_id:', experiment_id);
+              }
               
-              // 从HTML内容中提取标题（如果有的话）
-              const titleMatch = htmlContent.match(/<title>(.*?)<\/title>/i);
-              const title = titleMatch ? titleMatch[1] : '实验演示';
-              
-              // 创建实验记录（这里简化处理，实际应该有完整的实验数据结构）
-              const experimentData = {
-                experiment_id,
-                title,
-                description: `基于提示词"${prompt}"生成的实验演示`,
-                html_content: htmlContent,
-                css_content: '', // 流式生成的是完整HTML，CSS已内嵌
-                js_content: '',  // 流式生成的是完整HTML，JS已内嵌
-                parameters: [],
-                status: 'completed'
-              };
-              
-              console.log('📝 实验数据准备完成，experiment_id:', experiment_id);
-              
-              // 更新消息，添加experiment_id和内容
+              // 更新消息的完整内容和HTML内容
               await DatabaseService.updateMessage(message_id, {
                 content: fullContent,
                 experiment_id: experiment_id,
                 html_content: htmlContent
               });
               
-              console.log('✅ 消息更新完成，添加了experiment_id:', experiment_id);
+              console.log('✅ 消息内容更新完成，experiment_id:', experiment_id);
             } else {
               console.warn('⚠️ 未能从生成内容中提取HTML代码块');
+              // 即使没有HTML，也要更新内容
+              await DatabaseService.updateMessage(message_id, {
+                content: fullContent
+              });
             }
           } catch (error) {
-            console.error('❌ 处理实验数据或更新消息时出错:', error);
+            console.error('❌ 更新消息内容时出错:', error);
           }
         } else {
-          console.warn('⚠️ 缺少fullContent或message_id，跳过实验记录创建');
+          console.warn('⚠️ 缺少fullContent或message_id，跳过内容更新');
         }
         
       } catch (error) {
@@ -457,11 +466,11 @@ Now produce the summary followed by a complete, standalone HTML document inside 
         while (attempts < maxAttempts && !experimentData) {
           attempts++;
           console.log(`🚀 第${attempts}次尝试调用OpenAI API...`);
-          console.log('模型:', 'openai/gpt-4o-mini');
+          console.log('模型:', 'openai/gpt-5-mini');
           console.log('提示词长度:', prompt.length);
           
           const response = await openai.chat.completions.create({
-          model: 'openai/gpt-4o-mini',
+          model: 'openai/gpt-5-mini',
             messages: [
               {
                 role: 'system',
@@ -590,7 +599,7 @@ Now produce the summary followed by a complete, standalone HTML document inside 
                     
                     console.log('尝试让模型修复语法错误...');
                     const fixCompletion = await openai.chat.completions.create({
-                      model: 'openai/gpt-4o-mini',
+                      model: 'openai/gpt-5-mini',
                       messages: [
                         { role: 'system', content: '你是一个JavaScript代码修复专家。请修复提供的代码中的语法错误。' },
                         { role: 'user', content: fixPrompt }

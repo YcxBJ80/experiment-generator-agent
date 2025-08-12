@@ -2,7 +2,7 @@
  * This is a API server
  */
 
-import express, { type Request, type Response, type NextFunction }  from 'express';
+import express, { Request as ExpressRequest, Response as ExpressResponse, NextFunction } from 'express';
 import cors from 'cors';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -35,25 +35,11 @@ app.use((req, res, next) => {
 /**
  * Root route
  */
-app.get('/', (req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: 'Physics Experiment API Server',
+app.get('/', (req: ExpressRequest, res: ExpressResponse) => {
+  res.json({ 
+    message: 'AI实验平台 API 服务正在运行',
     version: '1.0.0',
-    endpoints: {
-      auth: '/api/auth',
-      experiments: '/api/experiments',
-      conversations: '/api/conversations',
-      messages: '/api/messages',
-      health: '/api/health'
-    },
-    documentation: {
-      experiments: {
-        generate: 'POST /api/experiments/generate - Generate physics experiments',
-        list: 'GET /api/experiments - List all experiments',
-        get: 'GET /api/experiments/:id - Get specific experiment'
-      }
-    }
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -65,33 +51,31 @@ app.use('/api/experiments', experimentsRoutes);
 app.use('/api/conversations', conversationsRoutes);
 app.use('/api/messages', messagesRoutes);
 
-/**
- * health
- */
-app.use('/api/health', (req: Request, res: Response, next: NextFunction): void => {
-  res.status(200).json({
-    success: true,
-    message: 'ok'
+app.get('/api/health', (req: ExpressRequest, res: ExpressResponse) => {
+  res.json({ 
+    status: 'healthy',
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    timestamp: new Date().toISOString()
   });
 });
 
-/**
- * error handler middleware
- */
-app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+// 错误处理中间件
+app.use((err: Error, req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
+  console.error('错误详情:', err);
   res.status(500).json({
     success: false,
-    error: 'Server internal error'
+    error: '服务器内部错误',
+    message: err.message
   });
 });
 
-/**
- * 404 handler
- */
-app.use((req: Request, res: Response) => {
+// 404 处理
+app.use((req: ExpressRequest, res: ExpressResponse) => {
   res.status(404).json({
     success: false,
-    error: 'API not found'
+    error: '接口不存在',
+    path: req.path
   });
 });
 

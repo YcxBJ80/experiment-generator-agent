@@ -1,5 +1,4 @@
-import express from 'express';
-import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
+import express, { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 import { ServerResponse } from 'http';
 import { randomUUID } from 'crypto';
 import OpenAI from 'openai';
@@ -106,7 +105,7 @@ interface GenerateExperimentResponse {
 /**
  * 流式生成实验demo
  */
-router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse & ServerResponse) => {
+router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse) => {
   console.log('🔥 流式端点被调用！');
   console.log('请求体:', req.body);
   try {
@@ -357,7 +356,7 @@ Now produce the summary followed by a complete, standalone HTML document inside 
 /**
  * 生成实验demo（非流式，保留兼容性）
  */
-router.post('/generate', async (req: ExpressRequest, res: ExpressResponse) => {
+router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { prompt, conversation_id }: GenerateExperimentRequest = req.body;
 
@@ -771,6 +770,13 @@ router.post('/', async (req: ExpressRequest, res: ExpressResponse) => {
       js_content: js_content || null
     });
 
+    if (!message) {
+      return res.status(500).json({
+        success: false,
+        error: '创建消息失败'
+      });
+    }
+
     console.log(`✅ 消息创建成功，ID: ${message.id}`);
     
     res.json({
@@ -783,6 +789,42 @@ router.post('/', async (req: ExpressRequest, res: ExpressResponse) => {
     res.status(500).json({
       success: false,
       error: '创建消息失败'
+    });
+  }
+});
+
+/**
+ * 更新消息
+ */
+router.put('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    console.log(`📝 更新消息，ID: ${id}`);
+    console.log('更新内容:', updates);
+    
+    const updatedMessage = await DatabaseService.updateMessage(id, updates);
+    
+    if (!updatedMessage) {
+      return res.status(404).json({
+        success: false,
+        error: '消息不存在或更新失败'
+      });
+    }
+
+    console.log(`✅ 消息更新成功，ID: ${id}`);
+    
+    res.json({
+      success: true,
+      data: updatedMessage
+    });
+
+  } catch (error) {
+    console.error('更新消息失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '更新消息失败'
     });
   }
 });

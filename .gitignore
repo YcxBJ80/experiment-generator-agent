@@ -24,3 +24,16 @@ dist-ssr
 *.sw?
 .vite
 .vercel
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+
+# Test files and reports
+test_*.js
+*_test.js
+*_report.md
+debug_*.js
+diagnose_*.js
