@@ -3,7 +3,7 @@ import { DatabaseService } from '../lib/supabase.js';
 
 const router = express.Router();
 
-// 获取所有对话
+// Get all conversations
 router.get('/', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const conversations = await DatabaseService.getConversations();
@@ -13,52 +13,52 @@ router.get('/', async (req: ExpressRequest, res: ExpressResponse) => {
   }
 });
 
-// 创建新对话
+// Create new conversation
 router.post('/', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { title } = req.body;
     
     if (!title) {
-      return res.status(400).json({ error: '标题不能为空' });
+      return res.status(400).json({ error: 'Title cannot be empty' });
     }
     
     const conversation = await DatabaseService.createConversation(title);
     
     if (!conversation) {
-      return res.status(500).json({ error: '创建对话失败' });
+      return res.status(500).json({ error: 'Failed to create conversation' });
     }
     
     res.json(conversation);
   } catch (error) {
-    console.error('创建对话错误:', error);
-    return res.status(500).json({ error: '服务器错误' });
+    console.error('Failed to create conversation:', error);
+    return res.status(500).json({ error: 'Server error' });
   }
 });
 
-// 获取对话的所有消息
+// Get all messages in conversation
 router.get('/:conversationId/messages', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { conversationId } = req.params;
     const messages = await DatabaseService.getMessages(conversationId);
     res.json(messages);
   } catch (error) {
-    console.error('获取消息错误:', error);
-    res.status(500).json({ error: '获取消息失败' });
+    console.error('Failed to get messages:', error);
+    res.status(500).json({ error: 'Failed to fetch messages' });
   }
 });
 
-// 在对话中创建消息
+// Create message in conversation
 router.post('/:conversationId/messages', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { conversationId } = req.params;
     const { role, content } = req.body;
     
     if (!role || !['user', 'assistant'].includes(role)) {
-      return res.status(400).json({ error: 'role必须是user或assistant' });
+      return res.status(400).json({ error: 'role must be user or assistant' });
     }
     
     if (role === 'user' && !content) {
-      return res.status(400).json({ error: '用户消息的content不能为空' });
+      return res.status(400).json({ error: 'User message content cannot be empty' });
     }
     
     const message = await DatabaseService.createMessage({
@@ -68,40 +68,40 @@ router.post('/:conversationId/messages', async (req: ExpressRequest, res: Expres
     });
     
     if (!message) {
-      return res.status(500).json({ error: '创建消息失败' });
+      return res.status(500).json({ error: 'Failed to create message' });
     }
     
     res.json({ data: message });
   } catch (error) {
-    console.error('创建消息错误:', error);
-    res.status(500).json({ error: '服务器错误' });
+    console.error('Failed to create message:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// 更新对话标题
+// Update conversation title
 router.put('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { id } = req.params;
     const { title } = req.body;
     
     if (!title) {
-      return res.status(400).json({ error: '标题不能为空' });
+      return res.status(400).json({ error: 'Title cannot be empty' });
     }
     
     const success = await DatabaseService.updateConversationTitle(id, title);
     
     if (!success) {
-      return res.status(500).json({ error: '更新对话失败' });
+      return res.status(500).json({ error: 'Failed to update conversation' });
     }
     
     res.json({ success: true });
   } catch (error) {
-    console.error('更新对话错误:', error);
-    res.status(500).json({ error: '服务器错误' });
+    console.error('Failed to update conversation:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// 删除对话
+// Delete conversation
 router.delete('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { id } = req.params;
@@ -109,13 +109,13 @@ router.delete('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
     const success = await DatabaseService.deleteConversation(id);
     
     if (!success) {
-      return res.status(500).json({ error: '删除对话失败' });
+      return res.status(500).json({ error: 'Failed to delete conversation' });
     }
     
     res.json({ success: true });
   } catch (error) {
-    console.error('删除对话错误:', error);
-    res.status(500).json({ error: '服务器错误' });
+    console.error('Failed to delete conversation:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

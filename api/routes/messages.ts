@@ -9,7 +9,7 @@ import { perplexityMCPClient } from '../lib/perplexityMcpClient.js';
 import { JavaScriptValidator } from '../lib/jsValidator.js';
 import { DatabaseService } from '../lib/supabase.js';
 
-// 确保环境变量已加载
+// Ensure environment variables are loaded
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../../.env') });
@@ -17,53 +17,53 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const router = express.Router();
 
 /**
- * 验证和清理JavaScript代码，防止HTML标签混入
+ * Validate and clean JavaScript code, prevent HTML tags from mixing in
  */
 function validateAndCleanJavaScript(jsCode: string): string {
   try {
-    // 移除可能的markdown代码块标记
+    // Remove possible markdown code block markers
     let cleanedCode = jsCode.replace(/```javascript\s*/g, '').replace(/```js\s*/g, '').replace(/```\s*/g, '');
     
-    // 移除真正的HTML标签（更精确的匹配）
-    // 只匹配真正的HTML标签，如 <div>, <script>, </div> 等
+    // Remove real HTML tags (more precise matching)
+    // Only match real HTML tags, such as <div>, <script>, </div> etc.
     cleanedCode = cleanedCode.replace(/<\/?[a-zA-Z][a-zA-Z0-9]*(?:\s[^>]*)?\s*>/g, '');
     
-    // 移除script标签及其内容
+    // Remove script tags and their content
     cleanedCode = cleanedCode.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
     
-    // 检查是否还有可疑的HTML标签模式（但保留比较操作符）
+    // Check if there are still suspicious HTML tag patterns (but keep comparison operators)
     const htmlTagPattern = /<\/?[a-zA-Z]/;
     if (htmlTagPattern.test(cleanedCode)) {
-      console.warn('⚠️ JavaScript代码中检测到可能的HTML标签残留');
+      console.warn('⚠️ Possible HTML tag residue detected in JavaScript code');
     }
     
-    // 基本的语法检查 - 检查括号匹配
+    // Basic syntax check - check bracket matching
     const openBraces = (cleanedCode.match(/\{/g) || []).length;
     const closeBraces = (cleanedCode.match(/\}/g) || []).length;
     const openParens = (cleanedCode.match(/\(/g) || []).length;
     const closeParens = (cleanedCode.match(/\)/g) || []).length;
     
     if (openBraces !== closeBraces) {
-      console.warn('⚠️ JavaScript代码中花括号不匹配');
+      console.warn('⚠️ Curly braces do not match in JavaScript code');
     }
     
     if (openParens !== closeParens) {
-      console.warn('⚠️ JavaScript代码中圆括号不匹配');
+      console.warn('⚠️ Parentheses do not match in JavaScript code');
     }
     
     return cleanedCode.trim();
   } catch (error) {
-    console.error('JavaScript代码验证失败:', error);
-    return jsCode; // 返回原始代码
+    console.error('JavaScript code validation failed:', error);
+    return jsCode; // Return original code
   }
 }
 
-// OpenAI 客户端配置
+// OpenAI client configuration
 let openai: OpenAI | null = null;
 
 try {
-  console.log('检查环境变量:');
-  console.log('OPENAI_API_KEY存在:', !!process.env.OPENAI_API_KEY);
+  console.log('Checking environment variables:');
+  console.log('OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY);
   console.log('OPENAI_BASE_URL:', process.env.OPENAI_BASE_URL);
   
   if (process.env.OPENAI_API_KEY) {
@@ -71,12 +71,12 @@ try {
       apiKey: process.env.OPENAI_API_KEY,
       baseURL: process.env.OPENAI_BASE_URL || 'https://openrouter.ai/api/v1',
     });
-    console.log('✅ OpenAI客户端初始化成功');
+    console.log('✅ OpenAI client initialized successfully');
   } else {
-    console.warn('❌ OPENAI_API_KEY环境变量未设置');
+    console.warn('❌ OPENAI_API_KEY environment variable not set');
   }
 } catch (error) {
-  console.warn('❌ OpenAI客户端初始化失败:', error);
+  console.warn('❌ OpenAI client initialization failed:', error);
 }
 
 interface GenerateExperimentRequest {
@@ -103,22 +103,22 @@ interface GenerateExperimentResponse {
 }
 
 /**
- * 流式生成实验demo
+ * Generate experiment demo with streaming
  */
 router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse) => {
-  console.log('🔥 流式端点被调用！');
-  console.log('请求体:', req.body);
+  console.log('🔥 Stream endpoint called!');
+    console.log('Request body:', req.body);
   try {
     const { prompt, conversation_id, message_id }: GenerateExperimentRequest & { message_id?: string } = req.body;
 
     if (!prompt) {
       return res.status(400).json({
         success: false,
-        error: '请提供实验需求描述'
+        error: 'Please provide experiment requirement description'
       });
     }
 
-    // 设置SSE响应头
+    // Set SSE response headers
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -127,12 +127,12 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
       'Access-Control-Allow-Headers': 'Cache-Control'
     });
 
-    // 首先通过Perplexity MCP获取相关知识
-    console.log('正在获取Perplexity知识...');
+    // First get relevant knowledge through Perplexity MCP
+    console.log('Getting Perplexity knowledge...');
     const perplexityKnowledge = await perplexityMCPClient.getExperimentKnowledge(prompt);
-    console.log('Perplexity知识获取完成');
+    console.log('Perplexity knowledge retrieval completed');
 
-    // 构建系统提示词
+    // Build system prompt
     const systemPrompt = `You are an AI agent specialized in creating highly interactive and visually stunning HTML-based experiment demos with rich animations and dynamic visualizations.
 
 You follow this pipeline for every request:
@@ -232,13 +232,13 @@ ${perplexityKnowledge}
 
 Now produce the summary followed by a complete, standalone HTML document inside a fenced code block labeled html. Focus heavily on creating stunning animations and visual effects that make the concepts come alive. Do not include any external URLs or dependencies.`;
 
-    // 调用OpenAI API生成实验（流式）
-    console.log('🔍 检查openai客户端状态:', !!openai);
+    // Call OpenAI API to generate experiment (streaming)
+    console.log('🔍 Checking openai client status:', !!openai);
     if (openai) {
       try {
-        console.log('🚀 开始流式调用OpenAI API...');
-        console.log('模型:', 'openai/gpt-5');
-        console.log('提示词长度:', prompt.length);
+        console.log('🚀 Starting streaming OpenAI API call...');
+        console.log('Model:', 'openai/gpt-5');
+        console.log('Prompt length:', prompt.length);
         
         const stream = await openai.chat.completions.create({
           model: 'openai/gpt-5-mini',
@@ -266,88 +266,88 @@ Now produce the summary followed by a complete, standalone HTML document inside 
             fullContent += content;
             chunkCount++;
             
-            // 发送SSE格式的流式数据到前端
+            // Send SSE format streaming data to frontend
             res.write(`data: ${content}\n\n`);
             
             if (chunkCount % 10 === 0) {
-              console.log(`📦 已发送 ${chunkCount} 个chunks，当前长度: ${fullContent.length}`);
+              console.log(`📦 Sent ${chunkCount} chunks, current length: ${fullContent.length}`);
             }
           }
         }
         
-        // 发送完成信号
+        // Send completion signal
         res.write('data: [DONE]\n\n');
         res.end();
         
-        console.log('✅ 流式响应完成，总chunks:', chunkCount, '总长度:', fullContent.length);
+        console.log('✅ Streaming response completed, total chunks:', chunkCount, 'total length:', fullContent.length);
         
-        // 在流式响应完成后，创建实验记录并更新消息
+        // After streaming response is complete, create experiment record and update message
         if (fullContent && message_id) {
           try {
-            console.log('🔧 开始处理实验数据和更新消息...');
+            console.log('🔧 Starting to process experiment data and update message...');
             
-            // 解析生成的内容，提取HTML代码块
+            // Parse generated content, extract HTML code block
             const htmlMatch = fullContent.match(/```html\s*([\s\S]*?)\s*```/);
             if (htmlMatch) {
               const htmlContent = htmlMatch[1].trim();
               
-              // 生成实验ID
+              // Generate experiment ID
               const experiment_id = randomUUID();
               
-              // 从HTML内容中提取标题（如果有的话）
+              // Extract title from HTML content (if any)
               const titleMatch = htmlContent.match(/<title>(.*?)<\/title>/i);
-              const title = titleMatch ? titleMatch[1] : '实验演示';
+              const title = titleMatch ? titleMatch[1] : 'Experiment Demo';
               
-              // 创建实验记录（这里简化处理，实际应该有完整的实验数据结构）
+              // Create experiment record (simplified here, should have complete experiment data structure)
               const experimentData = {
                 experiment_id,
                 title,
-                description: `基于提示词"${prompt}"生成的实验演示`,
+                description: `Experiment demo generated based on prompt "${prompt}"`,
                 html_content: htmlContent,
-                css_content: '', // 流式生成的是完整HTML，CSS已内嵌
-                js_content: '',  // 流式生成的是完整HTML，JS已内嵌
+                css_content: '', // Streaming generates complete HTML, CSS is embedded
+                js_content: '',  // Streaming generates complete HTML, JS is embedded
                 parameters: [],
                 status: 'completed'
               };
               
-              console.log('📝 实验数据准备完成，experiment_id:', experiment_id);
+              console.log('📝 Experiment data prepared, experiment_id:', experiment_id);
               
-              // 更新消息，添加experiment_id和内容
+              // Update message, add experiment_id and content
               await DatabaseService.updateMessage(message_id, {
                 content: fullContent,
                 experiment_id: experiment_id,
                 html_content: htmlContent
               });
               
-              console.log('✅ 消息更新完成，添加了experiment_id:', experiment_id);
+              console.log('✅ Message update completed, added experiment_id:', experiment_id);
             } else {
-              console.warn('⚠️ 未能从生成内容中提取HTML代码块');
+              console.warn('⚠️ Failed to extract HTML code block from generated content');
             }
           } catch (error) {
-            console.error('❌ 处理实验数据或更新消息时出错:', error);
+            console.error('❌ Error processing experiment data or updating message:', error);
           }
         } else {
-          console.warn('⚠️ 缺少fullContent或message_id，跳过实验记录创建');
+          console.warn('⚠️ Missing fullContent or message_id, skipping experiment record creation');
         }
         
       } catch (error) {
-        console.error('OpenAI API调用失败:', error);
-        res.write(`data: \n\n❌ 生成实验时出现错误：${error instanceof Error ? error.message : '未知错误'}\n\n`);
+        console.error('OpenAI API call failed:', error);
+        res.write(`data: \n\n❌ Error occurred while generating experiment: ${error instanceof Error ? error.message : 'Unknown error'}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
       }
     } else {
-      res.write('data: \n\n❌ OpenAI客户端未初始化\n\n');
+      res.write('data: \n\n❌ OpenAI client not initialized\n\n');
       res.write('data: [DONE]\n\n');
       res.end();
     }
     
   } catch (error) {
-    console.error('生成实验失败:', error);
+    console.error('Experiment generation failed:', error);
     if (!res.headersSent) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : '生成实验失败'
+        error: error instanceof Error ? error.message : 'Experiment generation failed'
       });
     }
   }
@@ -363,14 +363,14 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
     if (!prompt) {
       return res.status(400).json({
         success: false,
-        error: '请提供实验需求描述'
+        error: 'Please provide experiment requirement description'
       });
     }
 
     // 首先通过Perplexity MCP获取相关知识
-    console.log('正在获取Perplexity知识...');
+    console.log('Getting Perplexity knowledge...');
     const perplexityKnowledge = await perplexityMCPClient.getExperimentKnowledge(prompt);
-    console.log('Perplexity知识获取完成');
+    console.log('Perplexity knowledge retrieval completed');
 
     let attempts = 0;
 
@@ -469,9 +469,9 @@ Now produce the summary followed by a complete, standalone HTML document inside 
         
         while (attempts < maxAttempts && !experimentData) {
           attempts++;
-          console.log(`🚀 第${attempts}次尝试调用OpenAI API...`);
-          console.log('模型:', 'openai/gpt-5-mini');
-          console.log('提示词长度:', prompt.length);
+          console.log(`🚀 Attempt ${attempts} to call OpenAI API...`);
+          console.log('Model:', 'openai/gpt-5-mini');
+          console.log('Prompt length:', prompt.length);
           
           const response = await openai.chat.completions.create({
           model: 'openai/gpt-5-mini',
@@ -490,8 +490,8 @@ Now produce the summary followed by a complete, standalone HTML document inside 
           });
 
           const responseContent = response.choices[0]?.message?.content;
-          console.log('OpenAI响应长度:', responseContent?.length);
-          console.log('OpenAI响应前500字符:', responseContent?.substring(0, 500));
+          console.log('OpenAI response length:', responseContent?.length);
+          console.log('First 500 characters of OpenAI response:', responseContent?.substring(0, 500));
           
           if (responseContent) {
             try {
@@ -550,13 +550,13 @@ Now produce the summary followed by a complete, standalone HTML document inside 
                   }
                 }
 
-                console.log('提取的JSON字符串长度:', jsonStr.length);
-                console.log('清理后的JSON前200字符:', jsonStr.substring(0, 200));
+                console.log('Extracted JSON string length:', jsonStr.length);
+                console.log('First 200 characters of cleaned JSON:', jsonStr.substring(0, 200));
 
                 try {
                   rawData = JSON.parse(jsonStr);
                 } catch (firstParseError) {
-                  console.warn('第一次JSON解析失败，尝试修复格式:', firstParseError.message);
+                  console.warn('First JSON parse failed, trying to fix format:', firstParseError.message);
                   try {
                     let cleanedStr = jsonStr
                       .replace(/,\s*}/g, '}')
@@ -564,7 +564,7 @@ Now produce the summary followed by a complete, standalone HTML document inside 
                       .replace(/([{,]\s*)(\w+):/g, '$1"$2":');
                     rawData = JSON.parse(cleanedStr);
                   } catch (secondParseError) {
-                    console.warn('第二次JSON解析也失败，尝试手动提取字段:', secondParseError.message);
+                    console.warn('Second JSON parse also failed, trying manual field extraction:', secondParseError.message);
                     const titleMatch2 = jsonStr.match(/"title"\s*:\s*"([^"]+)"/);
                     const descMatch2 = jsonStr.match(/"description"\s*:\s*"([^"]+)"/);
                     const htmlMatch2 = jsonStr.match(/"html_content"\s*:\s*"([\s\S]*?)"\s*,\s*"css_content"/);
@@ -579,9 +579,9 @@ Now produce the summary followed by a complete, standalone HTML document inside 
                         js_content: jsMatch2 ? jsMatch2[1].replace(/\\"/g, '"') : '',
                         parameters: []
                       };
-                      console.log('✅ 手动提取字段成功');
+                      console.log('✅ Manual field extraction successful');
                     } else {
-                      throw new Error('无法提取必要字段');
+                      throw new Error('Unable to extract necessary fields');
                     }
                   }
                 }
@@ -595,13 +595,13 @@ Now produce the summary followed by a complete, standalone HTML document inside 
                 const validationResult = JavaScriptValidator.validateSyntax(rawData.js_content);
                 
                 if (!validationResult.isValid) {
-                  console.log(`第${attempts}次生成的代码存在语法错误:`, validationResult.errors);
+                  console.log(`Code generated in attempt ${attempts} has syntax errors:`, validationResult.errors);
                   
                   if (attempts < maxAttempts) {
                     // 生成修复提示词
                     const fixPrompt = JavaScriptValidator.generateFixPrompt(rawData.js_content, validationResult);
                     
-                    console.log('尝试让模型修复语法错误...');
+                    console.log('Trying to have model fix syntax errors...');
                     const fixCompletion = await openai.chat.completions.create({
                       model: 'openai/gpt-5-mini',
                       messages: [
@@ -622,15 +622,15 @@ Now produce the summary followed by a complete, standalone HTML document inside 
                         // 再次验证修复后的代码
                         const revalidationResult = JavaScriptValidator.validateSyntax(rawData.js_content);
                         if (revalidationResult.isValid) {
-                          console.log('代码修复成功！');
+                          console.log('Code fix successful!');
                           experimentData = rawData;
                         } else {
-                          console.log('代码修复失败，仍有错误:', revalidationResult.errors);
+                          console.log('Code fix failed, still has errors:', revalidationResult.errors);
                           // 如果修复失败，使用自动修复的代码
                           if (revalidationResult.fixedCode) {
                             rawData.js_content = revalidationResult.fixedCode;
                             experimentData = rawData;
-                            console.log('使用自动修复的代码');
+                            console.log('Using auto-fixed code');
                           }
                         }
                       }
@@ -640,13 +640,13 @@ Now produce the summary followed by a complete, standalone HTML document inside 
                     if (validationResult.fixedCode) {
                       rawData.js_content = validationResult.fixedCode;
                       experimentData = rawData;
-                      console.log('使用自动修复的代码作为最终结果');
+                      console.log('Using auto-fixed code as final result');
                     } else {
-                      throw new Error(`生成的JavaScript代码存在无法修复的语法错误: ${validationResult.errors.join(', ')}`);
+                      throw new Error(`Generated JavaScript code has unfixable syntax errors: ${validationResult.errors.join(', ')}`);
                     }
                   }
                 } else {
-                  console.log('代码语法检查通过！');
+                  console.log('Code syntax check passed!');
                   experimentData = rawData;
                 }
               } else {
@@ -655,8 +655,8 @@ Now produce the summary followed by a complete, standalone HTML document inside 
               
               console.log('✅ JSON解析成功');
             } catch (parseError) {
-              console.warn('❌ JSON解析失败:', parseError.message);
-              console.warn('原始响应前1000字符:', responseContent.substring(0, 1000));
+              console.warn('❌ JSON parsing failed:', parseError.message);
+              console.warn('First 1000 characters of raw response:', responseContent.substring(0, 1000));
               if (attempts >= maxAttempts) {
                 experimentData = null;
               }
@@ -664,38 +664,38 @@ Now produce the summary followed by a complete, standalone HTML document inside 
           }
         }
       } catch (apiError) {
-        console.error('🔍 进入API错误处理代码块');
-        console.error('❌ OpenAI API调用失败:');
-        console.error('错误类型:', apiError.constructor.name);
-        console.error('错误消息:', apiError.message);
-        console.error('错误详情:', apiError);
+        console.error('🔍 Entering API error handling code block');
+        console.error('❌ OpenAI API call failed:');
+        console.error('Error type:', apiError.constructor.name);
+        console.error('Error message:', apiError.message);
+        console.error('Error details:', apiError);
         
         // 如果是HTTP错误，尝试获取更多信息
         if (apiError.response) {
-          console.error('HTTP状态码:', apiError.response.status);
-          console.error('HTTP状态文本:', apiError.response.statusText);
-          console.error('响应头:', apiError.response.headers);
+          console.error('HTTP status code:', apiError.response.status);
+          console.error('HTTP status text:', apiError.response.statusText);
+          console.error('Response headers:', apiError.response.headers);
           try {
             const errorBody = await apiError.response.text();
-            console.error('错误响应体:', errorBody);
+            console.error('Error response body:', errorBody);
           } catch (e) {
-            console.error('无法读取错误响应体');
+            console.error('Unable to read error response body');
           }
         }
         
         experimentData = null;
       }
     } else {
-      console.warn('OpenAI客户端未初始化');
+      console.warn('OpenAI client not initialized');
       experimentData = null;
     }
 
     // 如果没有OpenAI数据，直接返回错误
     if (!experimentData) {
-      console.log('❌ 实验生成失败：OpenAI API调用失败且无备用数据');
+      console.log('❌ Experiment generation failed: OpenAI API call failed and no backup data');
       return res.status(500).json({
         success: false,
-        error: 'OpenAI API调用失败，无法生成实验。请检查API配置或稍后重试。'
+        error: 'OpenAI API call failed, unable to generate experiment. Please check API configuration or try again later.'
       });
     }
 
@@ -720,27 +720,27 @@ Now produce the summary followed by a complete, standalone HTML document inside 
     });
 
   } catch (error) {
-    console.error('实验生成失败:', error);
+    console.error('Experiment generation failed:', error);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : '实验生成失败'
+      error: error instanceof Error ? error.message : 'Experiment generation failed'
     });
   }
 });
 
 /**
- * 创建消息
+ * Create message
  */
 router.post('/', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { conversation_id, content, type, experiment_id, html_content, css_content, js_content } = req.body;
     
-    console.log(`📝 创建消息，对话ID: ${conversation_id}, 类型: ${type}`);
+    console.log(`📝 Creating message, conversation ID: ${conversation_id}, type: ${type}`);
     
     if (!conversation_id || type === undefined) {
       return res.status(400).json({
         success: false,
-        error: '缺少必要参数：conversation_id, type'
+        error: 'Missing required parameters: conversation_id, type'
       });
     }
 
@@ -748,14 +748,14 @@ router.post('/', async (req: ExpressRequest, res: ExpressResponse) => {
     if (type === 'user' && !content) {
       return res.status(400).json({
         success: false,
-        error: '用户消息的content不能为空'
+        error: 'User message content cannot be empty'
       });
     }
 
     if (!['user', 'assistant'].includes(type)) {
       return res.status(400).json({
         success: false,
-        error: 'type必须是user或assistant'
+        error: 'type must be user or assistant'
       });
     }
 
@@ -773,11 +773,11 @@ router.post('/', async (req: ExpressRequest, res: ExpressResponse) => {
     if (!message) {
       return res.status(500).json({
         success: false,
-        error: '创建消息失败'
+        error: 'Failed to create message'
       });
     }
 
-    console.log(`✅ 消息创建成功，ID: ${message.id}`);
+    console.log(`✅ Message created successfully, ID: ${message.id}`);
     
     res.json({
       success: true,
@@ -785,35 +785,35 @@ router.post('/', async (req: ExpressRequest, res: ExpressResponse) => {
     });
 
   } catch (error) {
-    console.error('创建消息失败:', error);
+    console.error('Failed to create message:', error);
     res.status(500).json({
       success: false,
-      error: '创建消息失败'
+      error: 'Failed to create message'
     });
   }
 });
 
 /**
- * 更新消息
+ * Update message
  */
 router.put('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { id } = req.params;
     const updates = req.body;
     
-    console.log(`📝 更新消息，ID: ${id}`);
-    console.log('更新内容:', updates);
+    console.log(`📝 Updating message, ID: ${id}`);
+    console.log('Update content:', updates);
     
     const updatedMessage = await DatabaseService.updateMessage(id, updates);
     
     if (!updatedMessage) {
       return res.status(404).json({
         success: false,
-        error: '消息不存在或更新失败'
+        error: 'Message does not exist or update failed'
       });
     }
 
-    console.log(`✅ 消息更新成功，ID: ${id}`);
+    console.log(`✅ Message updated successfully, ID: ${id}`);
     
     res.json({
       success: true,
@@ -821,41 +821,41 @@ router.put('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
     });
 
   } catch (error) {
-    console.error('更新消息失败:', error);
+    console.error('Failed to update message:', error);
     res.status(500).json({
       success: false,
-      error: '更新消息失败'
+      error: 'Failed to update message'
     });
   }
 });
 
 /**
- * 获取实验详情
+ * Get experiment details
  */
 router.get('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { id } = req.params;
-    console.log(`🔍 获取实验详情，ID: ${id}`);
+    console.log(`🔍 Getting experiment details, ID: ${id}`);
     
     // 从数据库获取实验数据
     const experiment = await DatabaseService.getExperimentById(id);
     
     if (!experiment) {
-      console.log(`❌ 未找到实验，ID: ${id}`);
+      console.log(`❌ Experiment not found, ID: ${id}`);
       return res.status(404).json({
         success: false,
-        error: '实验不存在'
+        error: 'Experiment does not exist'
       });
     }
 
-    console.log(`✅ 找到实验，ID: ${id}`);
+    console.log(`✅ Found experiment, ID: ${id}`);
     
     // 返回实验数据
     res.json({
       success: true,
       data: {
         experiment_id: experiment.id,
-        title: experiment.title || '实验演示',
+        title: experiment.title || 'Experiment Demo',
         html_content: experiment.html_content || '',
         css_content: '', // 从html_content中提取或留空
         js_content: ''   // 从html_content中提取或留空
@@ -863,10 +863,10 @@ router.get('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
     });
 
   } catch (error) {
-    console.error('获取实验失败:', error);
+    console.error('Failed to get experiment:', error);
     res.status(500).json({
       success: false,
-      error: '获取实验失败'
+      error: 'Failed to get experiment'
     });
   }
 });

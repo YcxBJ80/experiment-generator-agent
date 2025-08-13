@@ -63,17 +63,17 @@ class ApiClient {
 
       if (!response.ok) {
         try {
-          // 先读取响应文本
+          // First read response text
           const responseText = await response.text();
           try {
-            // 尝试解析为JSON
+            // Try to parse as JSON
             const errorData = JSON.parse(responseText);
             return {
               success: false,
               error: errorData.error || `HTTP ${response.status}: ${response.statusText}`,
             };
           } catch (jsonError) {
-            // 如果不是JSON格式，直接使用响应文本
+            // If not JSON format, use response text directly
             return {
               success: false,
               error: `HTTP ${response.status}: ${responseText || response.statusText}`,
@@ -89,33 +89,33 @@ class ApiClient {
 
       const data = await response.json();
       
-      // 检查后端是否已经返回ApiResponse格式
+      // Check if backend already returns ApiResponse format
       if (data && typeof data === 'object' && 'success' in data) {
         return data as ApiResponse<T>;
       }
       
-      // 后端直接返回数据，需要包装成ApiResponse格式
+      // Backend returns data directly, need to wrap as ApiResponse format
       return {
         success: true,
         data: data as T,
       };
     } catch (error) {
-      console.error('API请求失败:', error);
+      console.error('API request failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : '网络请求失败',
+        error: error instanceof Error ? error.message : 'Network request failed',
       };
     }
   }
 
   /**
-   * 生成实验（流式响应）
+   * Generate experiment (streaming response)
    */
   async generateExperimentStream(
     request: ExperimentGenerateRequest,
     onChunk: (chunk: string) => void
   ): Promise<void> {
-    console.log('🚀 开始调用流式API:', request);
+    console.log('🚀 Starting streaming API call:', request);
     try {
       const response = await fetch(`${API_BASE_URL}/experiments/generate-stream`, {
         method: 'POST',
@@ -125,21 +125,21 @@ class ApiClient {
         body: JSON.stringify(request),
       });
 
-      console.log('📡 收到响应:', response.status, response.statusText);
+      console.log('📡 Received response:', response.status, response.statusText);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ 响应错误:', errorText);
+        console.error('❌ Response error:', errorText);
         throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
       }
 
       const reader = response.body?.getReader();
       if (!reader) {
-        console.error('❌ 响应体不可读');
+        console.error('❌ Response body is not readable');
         throw new Error('Response body is not readable');
       }
 
-      console.log('📖 开始读取流式数据...');
+      console.log('📖 Starting to read streaming data...');
       const decoder = new TextDecoder();
       let buffer = '';
       let chunkCount = 0;
@@ -149,7 +149,7 @@ class ApiClient {
           const { done, value } = await reader.read();
           
           if (done) {
-            console.log('✅ 流式数据读取完成，总chunk数:', chunkCount);
+            console.log('✅ Streaming data reading completed, total chunks:', chunkCount);
             break;
           }
           
@@ -162,7 +162,7 @@ class ApiClient {
               const data = line.slice(6);
               if (data !== '[DONE]') {
                 chunkCount++;
-                console.log(`📦 收到chunk ${chunkCount}:`, data.substring(0, 50) + '...');
+                console.log(`📦 Received chunk ${chunkCount}:`, data.substring(0, 50) + '...');
                 onChunk(data);
               }
             }
@@ -172,34 +172,34 @@ class ApiClient {
         reader.releaseLock();
       }
     } catch (error) {
-      console.error('流式API请求失败:', error);
+      console.error('Streaming API request failed:', error);
       throw error;
     }
   }
 
   /**
-   * 获取实验详情
+   * Get experiment details
    */
   async getExperiment(id: string): Promise<ApiResponse<ExperimentData>> {
     return this.request<ExperimentData>(`/experiments/${id}`);
   }
 
   /**
-   * 健康检查
+   * Health check
    */
   async healthCheck(): Promise<ApiResponse<{ message: string }>> {
     return this.request<{ message: string }>('/health');
   }
 
   /**
-   * 获取所有对话
+   * Get all conversations
    */
   async getConversations(): Promise<ApiResponse<Conversation[]>> {
     return this.request<Conversation[]>('/conversations');
   }
 
   /**
-   * 创建新对话
+   * Create new conversation
    */
   async createConversation(title?: string): Promise<ApiResponse<Conversation>> {
     return this.request<Conversation>('/conversations', {
@@ -209,7 +209,7 @@ class ApiClient {
   }
 
   /**
-   * 更新对话标题
+   * Update conversation title
    */
   async updateConversationTitle(id: string, title: string): Promise<ApiResponse<{ success: boolean }>> {
     return this.request<{ success: boolean }>(`/conversations/${id}`, {
@@ -219,7 +219,7 @@ class ApiClient {
   }
 
   /**
-   * 删除对话
+   * Delete conversation
    */
   async deleteConversation(id: string): Promise<ApiResponse<{ success: boolean }>> {
     return this.request<{ success: boolean }>(`/conversations/${id}`, {
@@ -228,14 +228,14 @@ class ApiClient {
   }
 
   /**
-   * 获取对话的消息
+   * Get messages of conversation
    */
   async getMessages(conversationId: string): Promise<ApiResponse<Message[]>> {
     return this.request<Message[]>(`/conversations/${conversationId}/messages`);
   }
 
   /**
-   * 创建消息
+   * Create message
    */
   async createMessage(message: Omit<Message, 'id' | 'created_at'>): Promise<ApiResponse<Message>> {
     return this.request<Message>('/messages', {

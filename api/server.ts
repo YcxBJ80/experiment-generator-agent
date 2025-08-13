@@ -9,7 +9,7 @@ import { createServer } from 'http';
  */
 const PORT = process.env.PORT || 3001;
 
-// 尝试启动服务器，如果端口被占用则自动尝试下一个端口
+// Try to start server, if port is occupied then automatically try the next port
 function startServer(port: number): void {
   const server = createServer(app);
   
@@ -28,7 +28,7 @@ function startServer(port: number): void {
     }
   });
 
-  // 设置优雅关闭
+  // Setup graceful shutdown
   process.on('SIGTERM', () => {
     console.log('SIGTERM signal received');
     server.close(() => {

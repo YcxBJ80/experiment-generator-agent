@@ -37,7 +37,7 @@ app.use((req, res, next) => {
  */
 app.get('/', (req: ExpressRequest, res: ExpressResponse) => {
   res.json({ 
-    message: 'AI实验平台 API 服务正在运行',
+    message: 'AI Experiment Platform API service is running',
     version: '1.0.0',
     timestamp: new Date().toISOString()
   });
@@ -60,21 +60,21 @@ app.get('/api/health', (req: ExpressRequest, res: ExpressResponse) => {
   });
 });
 
-// 错误处理中间件
+// Error handling middleware
 app.use((err: Error, req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
-  console.error('错误详情:', err);
+  console.error('Error details:', err);
   res.status(500).json({
     success: false,
-    error: '服务器内部错误',
+    error: 'Internal server error',
     message: err.message
   });
 });
 
-// 404 处理
+// 404 handler
 app.use((req: ExpressRequest, res: ExpressResponse) => {
   res.status(404).json({
     success: false,
-    error: '接口不存在',
+    error: 'API endpoint not found',
     path: req.path
   });
 });

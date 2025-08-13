@@ -252,24 +252,25 @@ export class DatabaseService {
       const { data, error } = await supabase
         .from('messages')
         .select('experiment_id, html_content, content')
-        .eq('experiment_id', experimentId)
-        .not('html_content', 'is', null)
-        .single();
+        .eq('experiment_id', experimentId);
 
       if (error) {
         console.error('Error fetching experiment:', error);
         return null;
       }
 
-      if (!data) {
+      if (!data || data.length === 0) {
         console.log(`No experiment found with ID: ${experimentId}`);
         return null;
       }
 
+      // 取第一条记录
+      const experiment = data[0];
+      
       return {
-        id: data.experiment_id,
-        title: '实验演示', // 可以从content中提取标题
-        html_content: data.html_content
+        id: experiment.experiment_id,
+        title: 'Experiment Demo', // Can extract title from content
+        html_content: experiment.html_content
       };
     } catch (error) {
       console.error('Database error:', error);

@@ -129,7 +129,7 @@ function Home() {
 
   const handleNewChat = async () => {
     try {
-      const response = await apiClient.createConversation('新对话');
+      const response = await apiClient.createConversation('New Conversation');
       
       if (response.success && response.data) {
         const newConversation: Conversation = {
@@ -149,7 +149,7 @@ function Home() {
         }, 100);
       }
     } catch (error) {
-      console.error('创建新对话失败:', error);
+      console.error('Failed to create new conversation:', error);
     }
   };
 
@@ -158,7 +158,7 @@ function Home() {
     
     console.log('🗑️ 删除按钮被点击，对话ID:', conversationId);
     
-    const userConfirmed = confirm('确定要删除这个对话吗？此操作无法撤销。');
+    const userConfirmed = confirm('Are you sure you want to delete this conversation? This action cannot be undone.');
     console.log('👤 用户确认结果:', userConfirmed);
     
     if (!userConfirmed) {
@@ -175,20 +175,20 @@ function Home() {
         // 更新本地状态
         setConversations(prev => prev.filter(conv => conv.id !== conversationId));
         
-        // 如果删除的是当前对话，需要切换到其他对话或创建新对话
+        // If the deleted conversation is the current one, switch to another conversation or create a new one
         if (currentConversation === conversationId) {
           const remainingConversations = conversations.filter(conv => conv.id !== conversationId);
           if (remainingConversations.length > 0) {
             setCurrentConversation(remainingConversations[0].id);
           } else {
-            // 如果没有其他对话，创建新对话
+            // If there are no other conversations, create a new one
             handleNewChat();
           }
         }
       }
     } catch (error) {
       console.error('删除对话失败:', error);
-      alert('删除对话失败，请稍后重试。');
+      alert('Failed to delete conversation. Please try again later.');
     }
   };
 
@@ -219,7 +219,7 @@ function Home() {
         setConversations(prev => prev.map(conv => {
           if (conv.id === currentConversation) {
             const updatedMessages = [...conv.messages, userMessage];
-            // 如果是新对话的第一条消息，更新标题
+            // If this is the first message of a new conversation, update the title
             const title = conv.messages.length === 0 
               ? messageContent.length > 20 ? messageContent.substring(0, 20) + '...' : messageContent
               : conv.title;
@@ -400,7 +400,7 @@ function Home() {
       }
     } catch (error) {
       console.error('生成实验失败:', error);
-      const errorContent = `抱歉，生成实验时出现错误：${error instanceof Error ? error.message : '未知错误'}。请稍后重试。`;
+      const errorContent = `Sorry, an error occurred while generating the experiment: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again later.`;
       
       // 保存错误消息到数据库
       const errorMessageResponse = await apiClient.createMessage({
@@ -446,10 +446,10 @@ function Home() {
 
       {/* 聊天历史边栏 - 使用1/7的屏幕宽度 */}
       <div 
-        className={`fixed left-4 top-4 bottom-4 bg-dark-bg-secondary border border-dark-border rounded-2xl shadow-2xl z-20 transition-transform duration-300 ease-in-out overflow-y-auto sidebar-scroll ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'
+        className={`fixed left-1 top-1 bottom-1 bg-dark-bg-secondary border border-dark-border rounded-lg shadow-2xl z-20 transition-transform duration-300 ease-in-out overflow-y-auto sidebar-scroll ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-[calc(100%+0.25rem)]'
         }`}
-        style={{ width: 'calc((100vw / 5) - 2rem)' }}
+        style={{ width: 'calc((100vw / 5) - 0.5rem)' }}
         onMouseLeave={() => setIsSidebarOpen(false)}
       >
         <div className="p-4 border-b border-dark-border">
@@ -458,7 +458,7 @@ function Home() {
             className="w-full flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-low transition-colors"
           >
             <Plus className="w-4 h-4" />
-            新建对话
+            New Conversation
           </button>
         </div>
         
@@ -481,13 +481,13 @@ function Home() {
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <MessageSquare className="w-4 h-4 text-dark-text-secondary flex-shrink-0" />
                   <span className="text-sm text-dark-text font-medium truncate">
-                    {conv.title || '新对话'}
+                    {conv.title || 'New Conversation'}
                   </span>
                 </div>
                 <button
                   onClick={(e) => handleDeleteConversation(conv.id, e)}
                   className="p-1 text-dark-text-secondary hover:text-red-400 hover:bg-red-400/10 rounded transition-colors flex-shrink-0"
-                  title="删除对话"
+                  title="Delete Conversation"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -558,7 +558,7 @@ function Home() {
                             className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-low transition-colors"
                           >
                             <Play className="w-4 h-4" />
-                            查看交互式演示
+                            View Interactive Demo
                           </button>
                         </div>
                       )}
@@ -573,7 +573,7 @@ function Home() {
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-dark-text-secondary">加载中...</p>
+                <p className="text-dark-text-secondary">Loading...</p>
               </div>
             </div>
           ) : (
@@ -593,7 +593,7 @@ function Home() {
                   className="custom-rays" 
                 />
               </div>
-              <h1 className="text-4xl font-bold text-dark-text text-center relative z-20">Visualize An Experiment</h1>
+              <h1 className="text-4xl font-bold text-dark-text text-center relative z-20">Visualize an Experiment</h1>
             </div>
           )}
           
@@ -602,7 +602,7 @@ function Home() {
             <button
               onClick={scrollToBottom}
               className="fixed bottom-32 right-8 w-12 h-12 bg-primary hover:bg-primary-hover text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-20"
-              title="滚动到底部"
+              title="Scroll to Bottom"
             >
               <ChevronDown className="w-6 h-6" />
             </button>

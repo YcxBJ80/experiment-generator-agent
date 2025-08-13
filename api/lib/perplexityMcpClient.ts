@@ -21,11 +21,11 @@ export class PerplexityMCPClient {
   private isConnected = false;
 
   constructor() {
-    // 初始化客户端
+    // Initialize client
   }
 
   /**
-   * 连接到Perplexity MCP服务器
+   * Connect to Perplexity MCP server
    */
   async connect(): Promise<void> {
     try {
@@ -33,16 +33,16 @@ export class PerplexityMCPClient {
         return;
       }
 
-      console.log('正在启动Perplexity MCP服务器...');
+      console.log('Starting Perplexity MCP server...');
       
-      // 创建传输层 - 假设已经安装了perplexity-mcp-zerver
+      // Create transport layer - assuming perplexity-mcp-zerver is installed
       this.transport = new StdioClientTransport({
         command: 'node',
         args: ['/Users/yangchengxuan/Desktop/hackathone2/perplexity-mcp-zerver/build/index.js'],
         env: process.env
       });
 
-      // 创建客户端
+      // Create client
       this.client = new Client({
         name: 'perplexity-client',
         version: '1.0.0'
@@ -50,21 +50,21 @@ export class PerplexityMCPClient {
         capabilities: {}
       });
 
-      // 连接到服务器
+      // Connect to server
       await this.client.connect(this.transport);
       this.isConnected = true;
       
-      console.log('Perplexity MCP客户端连接成功');
+      console.log('Perplexity MCP client connected successfully');
     } catch (error) {
-      console.error('连接Perplexity MCP服务器失败:', error);
-      // 如果MCP连接失败，回退到模拟模式
+      console.error('Failed to connect to Perplexity MCP server:', error);
+      // If MCP connection fails, fallback to simulation mode
       this.isConnected = false;
       throw error;
     }
   }
 
   /**
-   * 断开连接
+   * Disconnect
    */
   async disconnect(): Promise<void> {
     try {
@@ -74,14 +74,14 @@ export class PerplexityMCPClient {
       }
       this.client = null;
       this.isConnected = false;
-      console.log('Perplexity MCP客户端已断开连接');
+      console.log('Perplexity MCP client disconnected');
     } catch (error) {
-      console.error('断开Perplexity MCP连接时出错:', error);
+      console.error('Error disconnecting Perplexity MCP connection:', error);
     }
   }
 
   /**
-   * 使用Perplexity搜索
+   * Search using Perplexity
    */
   async search(query: string, responseType: 'brief' | 'normal' | 'detailed' = 'normal'): Promise<PerplexitySearchResult> {
     try {
@@ -90,7 +90,7 @@ export class PerplexityMCPClient {
       }
 
       if (this.client && this.isConnected) {
-        // 使用MCP工具搜索
+        // Use MCP tool to search
         const searchResult = await this.client.callTool({
           name: 'search',
           arguments: {
@@ -99,7 +99,7 @@ export class PerplexityMCPClient {
           }
         });
 
-        console.log('Perplexity MCP搜索成功');
+        console.log('Perplexity MCP search successful');
         
         if (searchResult.content && Array.isArray(searchResult.content)) {
           const content = searchResult.content.map((c: any) => c.text || c).join(' ');
@@ -109,23 +109,23 @@ export class PerplexityMCPClient {
             metadata: {
               query,
               response_type: responseType,
-              sources: [] // Perplexity通常会在内容中包含来源信息
+              sources: [] // Perplexity usually includes source information in content
             }
           };
         }
       }
 
-      // 如果MCP失败，返回模拟数据
+      // If MCP fails, return simulation data
       return await this.searchFallback(query, responseType);
     } catch (error) {
-      console.error('Perplexity搜索时出错:', error);
-      // 回退到模拟模式
+      console.error('Error during Perplexity search:', error);
+      // Fallback to simulation mode
       return await this.searchFallback(query, responseType);
     }
   }
 
   /**
-   * 获取技术文档
+   * Get technical documentation
    */
   async getDocumentation(technology: string, context?: string): Promise<PerplexitySearchResult> {
     try {
@@ -156,9 +156,9 @@ export class PerplexityMCPClient {
         }
       }
 
-      // 回退模式
+      // Fallback mode
       return {
-        content: `关于 ${technology} 的文档信息：这是一个强大的技术工具，具有丰富的功能和广泛的应用场景。${context ? `在 ${context} 上下文中特别有用。` : ''}`,
+        content: `Documentation information about ${technology}: This is a powerful technical tool with rich features and wide application scenarios.${context ? ` Particularly useful in ${context} context.` : ''}`,
         metadata: {
           query: `${technology} documentation`,
           response_type: 'detailed',
@@ -166,9 +166,9 @@ export class PerplexityMCPClient {
         }
       };
     } catch (error) {
-      console.error('获取文档时出错:', error);
+      console.error('Error getting documentation:', error);
       return {
-        content: `获取 ${technology} 文档时出现错误，请稍后重试。`,
+        content: `Error occurred while getting ${technology} documentation, please try again later.`,
         metadata: {
           query: `${technology} documentation`,
           response_type: 'detailed',
@@ -179,7 +179,7 @@ export class PerplexityMCPClient {
   }
 
   /**
-   * 查找相关API
+   * Find related APIs
    */
   async findAPIs(requirements: string, context?: string): Promise<PerplexitySearchResult> {
     try {
@@ -210,9 +210,9 @@ export class PerplexityMCPClient {
         }
       }
 
-      // 回退模式
+      // Fallback mode
       return {
-        content: `针对 "${requirements}" 需求的API建议：建议查看相关的开源API和商业API解决方案。${context ? `在 ${context} 环境中可以考虑使用相应的技术栈。` : ''}`,
+        content: `API suggestions for "${requirements}" requirements: Recommend checking relevant open source APIs and commercial API solutions.${context ? ` In ${context} environment, consider using appropriate technology stack.` : ''}`,
         metadata: {
           query: `APIs for ${requirements}`,
           response_type: 'detailed',
@@ -220,9 +220,9 @@ export class PerplexityMCPClient {
         }
       };
     } catch (error) {
-      console.error('查找API时出错:', error);
+      console.error('Error finding APIs:', error);
       return {
-        content: `查找 "${requirements}" 相关API时出现错误，请稍后重试。`,
+        content: `Error occurred while finding APIs related to "${requirements}", please try again later.`,
         metadata: {
           query: `APIs for ${requirements}`,
           response_type: 'detailed',
@@ -233,7 +233,7 @@ export class PerplexityMCPClient {
   }
 
   /**
-   * 与Perplexity进行持续对话
+   * Continuous conversation with Perplexity
    */
   async chat(message: string, chatId?: string): Promise<PerplexityChatResult> {
     try {
@@ -268,29 +268,29 @@ export class PerplexityMCPClient {
         }
       }
 
-      // 回退模式
+      // Fallback mode
       return {
         chat_id: chatId || 'default',
-        response: `关于 "${message}" 的回复：这是一个有趣的话题，需要进一步的研究和分析。`
+        response: `Reply about "${message}": This is an interesting topic that requires further research and analysis.`
       };
     } catch (error) {
-      console.error('Perplexity聊天时出错:', error);
+      console.error('Error during Perplexity chat:', error);
       return {
         chat_id: chatId || 'default',
-        response: `处理消息 "${message}" 时出现错误，请稍后重试。`
+        response: `Error occurred while processing message "${message}", please try again later.`
       };
     }
   }
 
   /**
-   * 搜索回退方法（当MCP不可用时）
+   * Search fallback method (when MCP is unavailable)
    */
   private async searchFallback(query: string, responseType: 'brief' | 'normal' | 'detailed'): Promise<PerplexitySearchResult> {
-    // 模拟Perplexity搜索结果
+    // Simulate Perplexity search results
     const responses = {
-      brief: `关于 "${query}" 的简要信息：这是一个重要的主题，具有广泛的应用和研究价值。`,
-      normal: `关于 "${query}" 的详细信息：这个主题涉及多个方面，包括理论基础、实际应用和最新发展。相关研究表明这是一个活跃的领域，有许多有趣的发现和应用前景。`,
-      detailed: `关于 "${query}" 的深入分析：这是一个复杂而重要的主题，涉及多个学科和领域。从历史发展来看，这个领域经历了重要的演变和突破。当前的研究重点包括理论创新、技术应用和实际问题解决。未来的发展方向可能包括更深入的理论研究、更广泛的应用场景和更高效的解决方案。`
+      brief: `Brief information about "${query}": This is an important topic with wide applications and research value.`,
+      normal: `Detailed information about "${query}": This topic involves multiple aspects, including theoretical foundations, practical applications, and latest developments. Related research shows this is an active field with many interesting discoveries and application prospects.`,
+      detailed: `In-depth analysis of "${query}": This is a complex and important topic involving multiple disciplines and fields. From historical development perspective, this field has experienced significant evolution and breakthroughs. Current research focuses include theoretical innovation, technical applications, and practical problem solving. Future development directions may include deeper theoretical research, broader application scenarios, and more efficient solutions.`
     };
 
     return {
@@ -298,36 +298,36 @@ export class PerplexityMCPClient {
       metadata: {
         query,
         response_type: responseType,
-        sources: ['模拟数据源']
+        sources: ['Simulated data source']
       }
     };
   }
 
   /**
-   * 获取实验相关的知识（替代Wikipedia功能）
+   * Get experiment-related knowledge (alternative to Wikipedia functionality)
    */
   async getExperimentKnowledge(experimentTopic: string): Promise<string> {
     try {
-      // 首先尝试搜索基础信息
+      // First try to search basic information
       const searchResult = await this.search(experimentTopic, 'detailed');
       
-      // 然后尝试获取相关文档
+      // Then try to get related documentation
       const docResult = await this.getDocumentation(experimentTopic, 'experiment simulation');
       
-      let knowledge = `以下是关于 "${experimentTopic}" 的Perplexity研究结果：\n\n`;
+      let knowledge = `The following are Perplexity research results about "${experimentTopic}":\n\n`;
       
-      knowledge += `**基础信息：**\n${searchResult.content}\n\n`;
-      knowledge += `**技术文档：**\n${docResult.content}\n\n`;
+      knowledge += `**Basic Information:**\n${searchResult.content}\n\n`;
+      knowledge += `**Technical Documentation:**\n${docResult.content}\n\n`;
       
-      knowledge += `*信息来源：Perplexity AI 研究*\n`;
+      knowledge += `*Source: Perplexity AI Research*\n`;
 
       return knowledge;
     } catch (error) {
-      console.error('获取实验知识时出错:', error);
-      return `获取 "${experimentTopic}" 的Perplexity知识时出现错误。`;
+      console.error('Error getting experiment knowledge:', error);
+      return `Error occurred while getting Perplexity knowledge for "${experimentTopic}".`;
     }
   }
 }
 
-// 创建全局实例
+// Create global instance
 export const perplexityMCPClient = new PerplexityMCPClient();

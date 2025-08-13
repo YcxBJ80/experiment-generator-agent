@@ -1,6 +1,6 @@
 /**
- * JavaScript语法检查器
- * 用于检测和修复常见的JavaScript语法错误
+ * JavaScript syntax checker
+ * Used to detect and fix common JavaScript syntax errors
  */
 
 export interface ValidationResult {
@@ -13,21 +13,21 @@ export interface ValidationResult {
 export class JavaScriptValidator {
   
   /**
-   * 检查JavaScript代码的语法错误
+   * Check JavaScript code for syntax errors
    */
   static validateSyntax(code: string): ValidationResult {
     const errors: string[] = [];
     const suggestions: string[] = [];
     let fixedCode = code;
     
-    // 1. 检查括号匹配
+    // 1. Check bracket matching
     const bracketResult = this.checkBracketMatching(code);
     if (!bracketResult.isValid) {
       errors.push(...bracketResult.errors);
       suggestions.push(...bracketResult.suggestions);
     }
     
-    // 2. 检查if语句完整性
+    // 2. Check if statement completeness
     const ifResult = this.checkIfStatements(code);
     if (!ifResult.isValid) {
       errors.push(...ifResult.errors);
@@ -35,7 +35,7 @@ export class JavaScriptValidator {
       fixedCode = ifResult.fixedCode || fixedCode;
     }
     
-    // 3. 检查比较操作符
+    // 3. Check comparison operators
     const operatorResult = this.checkComparisonOperators(code);
     if (!operatorResult.isValid) {
       errors.push(...operatorResult.errors);
@@ -43,7 +43,7 @@ export class JavaScriptValidator {
       fixedCode = operatorResult.fixedCode || fixedCode;
     }
     
-    // 4. 检查箭头函数语法
+    // 4. Check arrow function syntax
     const arrowResult = this.checkArrowFunctions(code);
     if (!arrowResult.isValid) {
       errors.push(...arrowResult.errors);
@@ -51,11 +51,19 @@ export class JavaScriptValidator {
       fixedCode = arrowResult.fixedCode || fixedCode;
     }
     
-    // 5. 检查变量声明
+    // 5. Check variable declarations
     const varResult = this.checkVariableDeclarations(code);
     if (!varResult.isValid) {
       errors.push(...varResult.errors);
       suggestions.push(...varResult.suggestions);
+    }
+    
+    // 6. Check Canvas color format
+    const colorResult = this.checkCanvasColors(code);
+    if (!colorResult.isValid) {
+      errors.push(...colorResult.errors);
+      suggestions.push(...colorResult.suggestions);
+      fixedCode = colorResult.fixedCode || fixedCode;
     }
     
     return {
@@ -67,7 +75,7 @@ export class JavaScriptValidator {
   }
   
   /**
-   * 检查括号匹配
+   * Check bracket matching
    */
   private static checkBracketMatching(code: string): ValidationResult {
     const errors: string[] = [];
@@ -91,14 +99,14 @@ export class JavaScriptValidator {
       } else if (closeBrackets.includes(char)) {
         const lastOpen = stack.pop();
         if (!lastOpen || brackets[lastOpen as keyof typeof brackets] !== char) {
-          errors.push(`第${i + 1}个字符处括号不匹配: 期望 ${lastOpen ? brackets[lastOpen as keyof typeof brackets] : '无'}, 实际 ${char}`);
+          errors.push(`Bracket mismatch at character ${i + 1}: expected ${lastOpen ? brackets[lastOpen as keyof typeof brackets] : 'none'}, actual ${char}`);
         }
       }
     }
     
     if (stack.length > 0) {
-      errors.push(`未闭合的括号: ${stack.join(', ')}`);
-      suggestions.push('检查所有开放的括号是否都有对应的闭合括号');
+      errors.push(`Unclosed brackets: ${stack.join(', ')}`);
+      suggestions.push('Check that all opening brackets have corresponding closing brackets');
     }
     
     return {
@@ -109,36 +117,36 @@ export class JavaScriptValidator {
   }
   
   /**
-   * 检查if语句完整性
+   * Check if statement completeness
    */
   private static checkIfStatements(code: string): ValidationResult {
     const errors: string[] = [];
     const suggestions: string[] = [];
     let fixedCode = code;
     
-    // 检查不完整的if语句
+    // Check incomplete if statements
     const incompleteIfPattern = /if\s*\([^)]*[^)]\s*\{/g;
     const matches = [...code.matchAll(incompleteIfPattern)];
     
     for (const match of matches) {
       if (!match[0].includes(')')) {
-        errors.push(`不完整的if语句: ${match[0]}`);
-        suggestions.push('确保if条件有完整的括号和比较操作符');
+        errors.push(`Incomplete if statement: ${match[0]}`);
+        suggestions.push('Ensure if conditions have complete parentheses and comparison operators');
         
-        // 尝试修复
+        // Try to fix
         const fixed = match[0].replace(/\{$/, ' < 0){');
         fixedCode = fixedCode.replace(match[0], fixed);
       }
     }
     
-    // 检查缺少比较操作符的if条件
+    // Check if conditions missing comparison operators
     const missingOperatorPattern = /if\s*\([^)]*\w+\s+\w+[^)]*\)/g;
     const operatorMatches = [...code.matchAll(missingOperatorPattern)];
     
     for (const match of operatorMatches) {
       if (!/[><=!]=?/.test(match[0])) {
-        errors.push(`if条件缺少比较操作符: ${match[0]}`);
-        suggestions.push('在变量之间添加比较操作符 (>, <, >=, <=, ==, !=)');
+        errors.push(`If condition missing comparison operator: ${match[0]}`);
+        suggestions.push('Add comparison operators between variables (>, <, >=, <=, ==, !=)');
       }
     }
     
@@ -151,37 +159,37 @@ export class JavaScriptValidator {
   }
   
   /**
-   * 检查比较操作符
+   * Check comparison operators
    */
   private static checkComparisonOperators(code: string): ValidationResult {
     const errors: string[] = [];
     const suggestions: string[] = [];
     let fixedCode = code;
     
-    // 检查错误的语法模式，如 "const >" 或 "const <"
+    // Check for incorrect syntax patterns like "const >" or "const <"
     const invalidSyntaxPattern = /(const|let|var)\s*[<>]/g;
     const invalidMatches = [...code.matchAll(invalidSyntaxPattern)];
     
     for (const match of invalidMatches) {
-      errors.push(`发现 "${match[0]}" 语法错误`);
-      suggestions.push(`修复变量声明语法错误`);
+      errors.push(`Found "${match[0]}" syntax error`);
+      suggestions.push(`Fix variable declaration syntax error`);
       
-      // 修复：移除错误的操作符
+      // Fix: remove incorrect operator
       const fixed = match[0].replace(/\s*[<>]/, ' ');
       fixedCode = fixedCode.replace(match[0], fixed);
     }
     
-    // 检查if条件中缺少操作符的情况
+    // Check for missing operators in if conditions
     const ifMissingOpPattern = /if\s*\([^)]*\b(\w+)\s+(\w+)\b[^)]*\)/g;
     const ifMatches = [...code.matchAll(ifMissingOpPattern)];
     
     for (const match of ifMatches) {
-      // 检查是否真的缺少比较操作符
+      // Check if comparison operators are really missing
       if (!/[><=!]=?/.test(match[0])) {
-        errors.push(`if条件缺少比较操作符: ${match[0]}`);
-        suggestions.push(`在 "${match[1]}" 和 "${match[2]}" 之间添加比较操作符`);
+        errors.push(`If condition missing comparison operator: ${match[0]}`);
+        suggestions.push(`Add comparison operator between "${match[1]}" and "${match[2]}"`);
         
-        // 尝试智能修复
+        // Try smart fix
         const fixed = match[0].replace(`${match[1]} ${match[2]}`, `${match[1]} < ${match[2]}`);
         fixedCode = fixedCode.replace(match[0], fixed);
       }
@@ -196,20 +204,20 @@ export class JavaScriptValidator {
   }
   
   /**
-   * 检查箭头函数语法
+   * Check arrow function syntax
    */
   private static checkArrowFunctions(code: string): ValidationResult {
     const errors: string[] = [];
     const suggestions: string[] = [];
     let fixedCode = code;
     
-    // 检查错误的箭头函数语法 () = {
+    // Check for incorrect arrow function syntax () = {
     const wrongArrowPattern = /\(\s*\)\s*=\s*\{/g;
     const matches = [...code.matchAll(wrongArrowPattern)];
     
     for (const match of matches) {
-      errors.push(`错误的箭头函数语法: ${match[0]}`);
-      suggestions.push('箭头函数应该使用 => 而不是 =');
+      errors.push(`Incorrect arrow function syntax: ${match[0]}`);
+      suggestions.push('Arrow functions should use => instead of =');
       
       fixedCode = fixedCode.replace(match[0], '() => {');
     }
@@ -223,21 +231,21 @@ export class JavaScriptValidator {
   }
   
   /**
-   * 检查变量声明
+   * Check variable declarations
    */
   private static checkVariableDeclarations(code: string): ValidationResult {
     const errors: string[] = [];
     const suggestions: string[] = [];
     
-    // 检查未声明的变量赋值
+    // Check for undeclared variable assignments
     const undeclaredVarPattern = /^\s*[a-zA-Z_$][a-zA-Z0-9_$]*\s*=/gm;
     const matches = [...code.matchAll(undeclaredVarPattern)];
     
     for (const match of matches) {
       const varName = match[0].split('=')[0].trim();
       if (!code.includes(`const ${varName}`) && !code.includes(`let ${varName}`) && !code.includes(`var ${varName}`)) {
-        errors.push(`可能未声明的变量: ${varName}`);
-        suggestions.push(`使用 const, let 或 var 声明变量 ${varName}`);
+        errors.push(`Possibly undeclared variable: ${varName}`);
+        suggestions.push(`Declare variable ${varName} using const, let or var`);
       }
     }
     
@@ -249,7 +257,90 @@ export class JavaScriptValidator {
   }
   
   /**
-   * 生成修复建议的提示词
+   * Check Canvas color format
+   */
+  private static checkCanvasColors(code: string): ValidationResult {
+    const errors: string[] = [];
+    const suggestions: string[] = [];
+    let fixedCode = code;
+    
+    // Check RGBA color format errors - find rgba() with 5 or more parameters
+    const invalidRgbaPattern = /rgba\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*,\s*([0-9.]+)[^)]*\)/g;
+    const matches = [...code.matchAll(invalidRgbaPattern)];
+    
+    for (const match of matches) {
+      const [fullMatch, r, g, b, alpha1, alpha2] = match;
+      errors.push(`Invalid RGBA color format: ${fullMatch} - RGBA can only have 4 parameters`);
+      suggestions.push('RGBA format should be rgba(red, green, blue, alpha), alpha value between 0-1');
+      
+      // Fix: use first alpha value, remove extra parameters
+      const fixedColor = `rgba(${r},${g},${b},${alpha1})`;
+      fixedCode = fixedCode.replace(fullMatch, fixedColor);
+    }
+    
+    // Check RGB color format errors - find rgb() with 4 or more parameters
+    const invalidRgbPattern = /rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)[^)]*\)/g;
+    const rgbMatches = [...code.matchAll(invalidRgbPattern)];
+    
+    for (const match of rgbMatches) {
+      const [fullMatch, r, g, b, extra] = match;
+      errors.push(`Invalid RGB color format: ${fullMatch} - RGB can only have 3 parameters`);
+      suggestions.push('RGB format should be rgb(red, green, blue), or use rgba(red, green, blue, alpha)');
+      
+      // Fix: remove extra parameters, or convert to RGBA
+      const fixedColor = `rgb(${r},${g},${b})`;
+      fixedCode = fixedCode.replace(fullMatch, fixedColor);
+    }
+    
+    // Check color value ranges
+    const colorRangePattern = /rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+))?\s*\)/g;
+    const rangeMatches = [...code.matchAll(colorRangePattern)];
+    
+    for (const match of rangeMatches) {
+      const [fullMatch, r, g, b, alpha] = match;
+      const rVal = parseInt(r);
+      const gVal = parseInt(g);
+      const bVal = parseInt(b);
+      const alphaVal = alpha ? parseFloat(alpha) : null;
+      
+      let needsFix = false;
+      let fixedR = rVal;
+      let fixedG = gVal;
+      let fixedB = bVal;
+      let fixedAlpha = alphaVal;
+      
+      // Check RGB value range (0-255)
+      if (rVal > 255) { fixedR = 255; needsFix = true; }
+      if (gVal > 255) { fixedG = 255; needsFix = true; }
+      if (bVal > 255) { fixedB = 255; needsFix = true; }
+      
+      // Check alpha value range (0-1)
+      if (alphaVal !== null && alphaVal > 1) {
+        fixedAlpha = 1;
+        needsFix = true;
+      }
+      
+      if (needsFix) {
+        errors.push(`Color value out of range: ${fullMatch}`);
+        suggestions.push('RGB values should be between 0-255, alpha value should be between 0-1');
+        
+        const fixedColor = alphaVal !== null 
+          ? `rgba(${fixedR},${fixedG},${fixedB},${fixedAlpha})`
+          : `rgb(${fixedR},${fixedG},${fixedB})`;
+        fixedCode = fixedCode.replace(fullMatch, fixedColor);
+      }
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors,
+      suggestions,
+      fixedCode: errors.length > 0 ? fixedCode : undefined
+    };
+  }
+
+  /**
+   * Generate fix suggestion prompt
    */
   static generateFixPrompt(originalCode: string, validationResult: ValidationResult): string {
     if (validationResult.isValid) {
@@ -260,27 +351,27 @@ export class JavaScriptValidator {
     const suggestionList = validationResult.suggestions.map((suggestion, index) => `${index + 1}. ${suggestion}`).join('\n');
     
     return `
-检测到JavaScript代码中存在以下语法错误：
-
-错误列表：
-${errorList}
-
-修复建议：
-${suggestionList}
-
-请修复这些错误并重新生成完整的JavaScript代码。确保：
-- 所有if语句都有完整的条件和括号
-- 所有比较操作符都明确写出
-- 箭头函数使用正确的 => 语法
-- 所有括号都正确匹配
-- 变量都正确声明
-
-原始代码：
-\`\`\`javascript
-${originalCode}
-\`\`\`
-
-请返回修复后的完整JavaScript代码。
-`;
+ The following syntax errors were detected in the JavaScript code:
+ 
+ Error list:
+ ${errorList}
+ 
+ Fix suggestions:
+ ${suggestionList}
+ 
+ Please fix these errors and regenerate the complete JavaScript code. Ensure:
+ - All if statements have complete conditions and parentheses
+ - All comparison operators are explicitly written
+ - Arrow functions use correct => syntax
+ - All brackets are properly matched
+ - Variables are properly declared
+ 
+ Original code:
+ \`\`\`javascript
+ ${originalCode}
+ \`\`\`
+ 
+ Please return the fixed complete JavaScript code.
+ `;
   }
 }

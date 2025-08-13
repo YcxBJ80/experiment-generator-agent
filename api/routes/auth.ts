@@ -2,7 +2,7 @@ import express, { Request as ExpressRequest, Response as ExpressResponse } from 
 
 const router = express.Router();
 
-// 简单的健康检查路由
+// Simple health check route
 router.get('/health', (req: ExpressRequest, res: ExpressResponse) => {
   res.json({ status: 'ok', message: 'Auth service is running' });
 });

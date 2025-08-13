@@ -25,13 +25,13 @@ export default function Demo() {
       }
 
       try {
-        // 首先尝试从localStorage获取
+        // First try to get from localStorage
         const localData = localStorage.getItem(`experiment_${id}`);
         if (localData) {
           const experimentData: ExperimentData = JSON.parse(localData);
           const displayData: ExperimentDisplayData = {
             id: experimentData.experiment_id,
-            title: '实验演示', // 可以从实验内容中提取标题
+            title: 'Experiment Demo', // Can extract title from experiment content
             htmlContent: experimentData.html_content,
             cssContent: experimentData.css_content,
             jsContent: experimentData.js_content
@@ -41,23 +41,23 @@ export default function Demo() {
           return;
         }
 
-        // 如果localStorage中没有，尝试从API获取
+        // If not in localStorage, try to get from API
         const response = await apiClient.getExperiment(id);
         if (response.success && response.data) {
           const displayData: ExperimentDisplayData = {
             id: response.data.experiment_id,
-            title: '实验演示',
+            title: 'Experiment Demo',
             htmlContent: response.data.html_content,
             cssContent: response.data.css_content,
             jsContent: response.data.js_content
           };
           setExperiment(displayData);
         } else {
-          throw new Error(response.error || '获取实验数据失败');
+          throw new Error(response.error || 'Failed to fetch experiment data');
         }
       } catch (error) {
-        console.error('加载实验失败:', error);
-        // 不使用fallback，直接显示错误
+        console.error('Failed to load experiment:', error);
+        // Don't use fallback, show error directly
         setExperiment(null);
       } finally {
         setLoading(false);
@@ -69,14 +69,14 @@ export default function Demo() {
 
   useEffect(() => {
     if (experiment && experiment.htmlContent) {
-      // 直接使用完整的HTML内容
+      // Use complete HTML content directly
       const iframe = document.getElementById('experiment-iframe') as HTMLIFrameElement;
       if (iframe) {
-        // 如果html_content已经是完整的HTML文档，直接使用
+        // If html_content is already a complete HTML document, use it directly
         if (experiment.htmlContent.includes('<!doctype html>') || experiment.htmlContent.includes('<!DOCTYPE html>')) {
           iframe.srcdoc = experiment.htmlContent;
         } else {
-          // 如果不是完整文档，包装一下
+          // If not a complete document, wrap it
           const fullHtml = `
             <!DOCTYPE html>
             <html lang="zh-CN">
@@ -103,7 +103,7 @@ export default function Demo() {
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center" style={{ backgroundColor: '#2D3748' }}>
-        <div className="text-gray-600">加载实验中...</div>
+        <div className="text-gray-600">Loading experiment...</div>
       </div>
     );
   }
@@ -111,20 +111,20 @@ export default function Demo() {
   if (!experiment) {
     return (
       <div className="h-screen relative" style={{ backgroundColor: '#2D3748' }}>
-        {/* 返回按钮 */}
+        {/* Back button */}
         <button
           onClick={handleGoBack}
           className="absolute top-4 left-4 z-10 flex items-center gap-2 px-4 py-2 bg-dark-bg-secondary hover:bg-dark-bg-tertiary border border-dark-border rounded-low text-dark-text transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          返回
+          Back
         </button>
 
-        {/* 错误信息 */}
+        {/* Error message */}
         <div className="h-full flex items-center justify-center">
           <div className="text-center">
-            <div className="text-gray-600 text-lg mb-4">实验不存在或加载失败</div>
-            <div className="text-gray-500 text-sm">请检查实验ID是否正确，或稍后重试</div>
+            <div className="text-gray-600 text-lg mb-4">Experiment not found or failed to load</div>
+        <div className="text-gray-500 text-sm">Please check if the experiment ID is correct, or try again later</div>
           </div>
         </div>
       </div>
@@ -133,20 +133,20 @@ export default function Demo() {
 
   return (
     <div className="h-screen relative" style={{ backgroundColor: '#2D3748' }}>
-      {/* 返回按钮 */}
+      {/* Return button */}
       <button
         onClick={handleGoBack}
         className="absolute top-4 left-4 z-10 flex items-center gap-2 px-4 py-2 bg-dark-bg-secondary hover:bg-dark-bg-tertiary border border-dark-border rounded-low text-dark-text transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
-        返回
+        Back
       </button>
 
-      {/* 实验展示区域 */}
+      {/* Experiment display area */}
       <iframe
         id="experiment-iframe"
         className="w-full h-full border-none"
-        title={experiment?.title || '实验演示'}
+        title={experiment?.title || 'Experiment Demo'}
         sandbox="allow-scripts allow-same-origin"
       />
     </div>

@@ -15,11 +15,11 @@ export class WikipediaMCPClient {
   private serverProcess: any = null;
 
   constructor() {
-    // 初始化客户端
+    // Initialize client
   }
 
   /**
-   * 连接到Wikipedia MCP服务器
+   * Connect to Wikipedia MCP server
    */
   async connect(): Promise<void> {
     try {
@@ -27,9 +27,9 @@ export class WikipediaMCPClient {
         return;
       }
 
-      console.log('正在启动Wikipedia MCP服务器...');
+      console.log('Starting Wikipedia MCP server...');
       
-      // 设置代理环境变量
+      // Set proxy environment variables
       const env = {
         ...process.env,
         https_proxy: 'http://127.0.0.1:7890',
@@ -37,14 +37,14 @@ export class WikipediaMCPClient {
         all_proxy: 'socks5://127.0.0.1:7890'
       };
 
-      // 创建传输层
+      // Create transport layer
       this.transport = new StdioClientTransport({
         command: 'wikipedia-mcp',
         args: ['--language', 'en'],
         env
       });
 
-      // 创建客户端
+      // Create client
       this.client = new Client({
         name: 'wikipedia-client',
         version: '1.0.0'
@@ -52,21 +52,21 @@ export class WikipediaMCPClient {
         capabilities: {}
       });
 
-      // 连接到服务器
+      // Connect to server
       await this.client.connect(this.transport);
       this.isConnected = true;
       
-      console.log('Wikipedia MCP客户端连接成功');
+      console.log('Wikipedia MCP client connected successfully');
     } catch (error) {
-      console.error('连接Wikipedia MCP服务器失败:', error);
-      // 如果MCP连接失败，回退到直接API调用
+      console.error('Failed to connect to Wikipedia MCP server:', error);
+      // If MCP connection fails, fallback to direct API calls
       this.isConnected = false;
       throw error;
     }
   }
 
   /**
-   * 断开连接
+   * Disconnect
    */
   async disconnect(): Promise<void> {
     try {
@@ -76,14 +76,14 @@ export class WikipediaMCPClient {
       }
       this.client = null;
       this.isConnected = false;
-      console.log('Wikipedia MCP客户端已断开连接');
+      console.log('Wikipedia MCP client disconnected');
     } catch (error) {
-      console.error('断开Wikipedia MCP连接时出错:', error);
+      console.error('Error disconnecting Wikipedia MCP connection:', error);
     }
   }
 
   /**
-   * 搜索Wikipedia文章
+   * Search Wikipedia articles
    */
   async searchWikipedia(query: string, limit: number = 3): Promise<WikipediaSearchResult[]> {
     try {
@@ -92,7 +92,7 @@ export class WikipediaMCPClient {
       }
 
       if (this.client && this.isConnected) {
-        // 使用MCP工具搜索
+        // Use MCP tool to search
         const searchResult = await this.client.callTool({
           name: 'search_wikipedia',
           arguments: {
@@ -101,22 +101,22 @@ export class WikipediaMCPClient {
           }
         });
 
-        console.log('MCP搜索成功');
+        console.log('MCP search successful');
         
-        // 根据实际测试，search_wikipedia返回的是content数组
+        // Based on actual testing, search_wikipedia returns content array
         if (searchResult.content && Array.isArray(searchResult.content)) {
           const results: WikipediaSearchResult[] = [];
           
-          // 解析搜索结果
+          // Parse search results
           const searchText = searchResult.content.map((c: any) => c.text || c).join(' ');
           
           try {
-            // 尝试解析JSON格式的搜索结果
+            // Try to parse JSON format search results
             const searchData = JSON.parse(searchText);
             
             if (searchData.results && Array.isArray(searchData.results)) {
               for (const item of searchData.results.slice(0, limit)) {
-                // 获取每个文章的摘要
+                // Get summary for each article
                 try {
                   const summaryResult = await this.client.callTool({
                     name: 'get_summary',
@@ -127,19 +127,19 @@ export class WikipediaMCPClient {
                   
                   let content = '';
                   if (summaryResult.content && Array.isArray(summaryResult.content)) {
-                    // 提取摘要文本
+                    // Extract summary text
                     const summaryText = summaryResult.content.map((c: any) => c.text || c).join(' ');
                     try {
-                      // 尝试解析JSON格式的摘要
+                      // Try to parse JSON format summary
                       const summaryData = JSON.parse(summaryText);
                       content = summaryData.summary || summaryText;
                     } catch {
-                      // 如果不是JSON，直接使用文本
+                      // If not JSON, use text directly
                       content = summaryText;
                     }
                   } else {
-                    // 回退到搜索片段
-                    content = item.snippet ? item.snippet.replace(/<[^>]*>/g, '') : '无摘要';
+                    // Fallback to search snippet
+                    content = item.snippet ? item.snippet.replace(/<[^>]*>/g, '') : 'No summary';
                   }
                   
                   results.push({
@@ -148,19 +148,19 @@ export class WikipediaMCPClient {
                     url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`
                   });
                 } catch (summaryError) {
-                  console.error(`获取文章 ${item.title} 摘要失败:`, summaryError);
-                  // 如果获取摘要失败，使用搜索片段
+                  console.error(`Failed to get summary for article ${item.title}:`, summaryError);
+                  // If getting summary fails, use search snippet
                   results.push({
                     title: item.title,
-                    content: item.snippet ? item.snippet.replace(/<[^>]*>/g, '') : '无摘要',
+                    content: item.snippet ? item.snippet.replace(/<[^>]*>/g, '') : 'No summary',
                     url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`
                   });
                 }
               }
             }
           } catch (parseError) {
-            console.error('解析搜索结果JSON失败:', parseError);
-            // 如果解析失败，直接使用文本内容
+            console.error('Failed to parse search results JSON:', parseError);
+            // If parsing fails, use text content directly
             results.push({
               title: query,
               content: searchText,
@@ -172,21 +172,21 @@ export class WikipediaMCPClient {
         }
       }
 
-      // 如果MCP失败，回退到API模式
+      // If MCP fails, fallback to API mode
       return await this.searchWikipediaAPI(query, limit);
     } catch (error) {
-      console.error('搜索Wikipedia时出错:', error);
-      // 回退到API模式
+      console.error('Error searching Wikipedia:', error);
+      // Fallback to API mode
       return await this.searchWikipediaAPI(query, limit);
     }
   }
 
   /**
-   * 使用Wikipedia API搜索（作为MCP的替代实现）
+   * Search using Wikipedia API (as alternative to MCP)
    */
   private async searchWikipediaAPI(query: string, limit: number): Promise<WikipediaSearchResult[]> {
     try {
-      // 搜索相关文章
+      // Search related articles
       const searchUrl = `https://en.wikipedia.org/api/rest_v1/page/search?q=${encodeURIComponent(query)}&limit=${limit}`;
       const searchResponse = await fetch(searchUrl);
       const searchData = await searchResponse.json();
@@ -197,7 +197,7 @@ export class WikipediaMCPClient {
 
       const results: WikipediaSearchResult[] = [];
 
-      // 获取每篇文章的详细内容
+      // Get detailed content for each article
       for (const page of searchData.pages.slice(0, limit)) {
         try {
           const contentUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(page.key)}`;
@@ -210,8 +210,8 @@ export class WikipediaMCPClient {
             url: contentData.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(page.key)}`
           });
         } catch (error) {
-          console.error(`获取文章 ${page.title} 内容时出错:`, error);
-          // 如果获取详细内容失败，至少保留基本信息
+          console.error(`Error getting content for article ${page.title}:`, error);
+          // If getting detailed content fails, at least keep basic info
           results.push({
             title: page.title,
             content: page.description || '',
@@ -222,40 +222,40 @@ export class WikipediaMCPClient {
 
       return results;
     } catch (error) {
-      console.error('调用Wikipedia API时出错:', error);
+      console.error('Error calling Wikipedia API:', error);
       return [];
     }
   }
 
   /**
-   * 获取实验相关的Wikipedia知识
+   * Get Wikipedia knowledge related to experiments
    */
   async getExperimentKnowledge(experimentTopic: string): Promise<string> {
     try {
       const searchResults = await this.searchWikipedia(experimentTopic, 2);
       
       if (searchResults.length === 0) {
-        return `没有找到关于 "${experimentTopic}" 的相关Wikipedia信息。`;
+        return `No relevant Wikipedia information found for "${experimentTopic}".`;
       }
 
-      let knowledge = `以下是关于 "${experimentTopic}" 的Wikipedia知识：\n\n`;
+      let knowledge = `Here is Wikipedia knowledge about "${experimentTopic}":\n\n`;
       
       searchResults.forEach((result, index) => {
         knowledge += `${index + 1}. **${result.title}**\n`;
         knowledge += `${result.content}\n`;
         if (result.url) {
-          knowledge += `参考链接: ${result.url}\n`;
+          knowledge += `Reference link: ${result.url}\n`;
         }
         knowledge += '\n';
       });
 
       return knowledge;
     } catch (error) {
-      console.error('获取实验知识时出错:', error);
-      return `获取 "${experimentTopic}" 的Wikipedia知识时出现错误。`;
+      console.error('Error getting experiment knowledge:', error);
+      return `Error occurred while getting Wikipedia knowledge for "${experimentTopic}".`;
     }
   }
 }
 
-// 创建全局实例
+// Create global instance
 export const wikipediaMCPClient = new WikipediaMCPClient();

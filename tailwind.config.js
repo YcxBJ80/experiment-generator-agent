@@ -9,7 +9,7 @@ export default {
     },
     extend: {
       colors: {
-        // 暗色主题颜色配置
+        // Dark theme color configuration
         dark: {
           bg: '#0f0f0f',
           'bg-secondary': '#1a1a1a',
@@ -20,7 +20,7 @@ export default {
           border: '#2a2a2a',
           'border-light': '#3a3a3a',
         },
-        // 低饱和度彩色元素
+        // Low saturation colored elements
         accent: {
           blue: '#4a5568',
           gray: '#718096',
@@ -32,10 +32,10 @@ export default {
         mono: ['Fira Code', 'monospace'],
       },
       spacing: {
-        '2': '8px', // 统一间距
+        '2': '8px', // Unified spacing
       },
       borderRadius: {
-        'low': '4px', // 低弧度圆角
+        'low': '4px', // Low radius rounded corners
         'medium': '6px',
       },
     },
