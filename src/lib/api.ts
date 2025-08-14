@@ -4,6 +4,7 @@ export interface ExperimentGenerateRequest {
   prompt: string;
   conversation_id?: string;
   message_id?: string;
+  model?: string;
 }
 
 export interface ExperimentData {

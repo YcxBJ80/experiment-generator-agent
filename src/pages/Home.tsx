@@ -28,6 +28,7 @@ function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('openai/gpt-5-mini');
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -35,6 +36,14 @@ function Home() {
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   // 滚动到底部按钮状态
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
+  // 可选择的模型列表
+  const availableModels = [
+    { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini' },
+    { id: 'qwen/qwen3-coder', name: 'Qwen3 Coder' },
+    { id: 'moonshotai/kimi-k2', name: 'Kimi K2' },
+    { id: 'google/gemini-2.5-pro', name: 'Gemini 2.5 Pro' }
+  ];
 
   // 加载对话历史
   useEffect(() => {
@@ -267,7 +276,8 @@ function Home() {
            {
              prompt: messageContent,
              conversation_id: currentConversation,
-             message_id: assistantMessageResponse.data.id
+             message_id: assistantMessageResponse.data.id,
+             model: selectedModel
            },
            (chunk: string) => {
              // 实时更新消息内容
@@ -611,25 +621,46 @@ function Home() {
 
         {/* 输入区域 */}
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-10 w-3/5">
-          <div className="bg-dark-bg-secondary border border-dark-border rounded-3xl shadow-2xl p-2 w-full">
-            <div className="flex gap-1">
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                placeholder="Describe the experiment you want to create..."
-                className="flex-1 px-6 py-2 bg-dark-bg border border-dark-border rounded-2xl text-dark-text placeholder-dark-text-secondary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                disabled={isGenerating}
-              />
+          <div className="bg-dark-bg-secondary border border-dark-border rounded-3xl shadow-2xl p-3 w-full">
+            {/* 输入和发送区域 */}
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                  placeholder="Describe the experiment you want to create..."
+                  className="w-full px-6 py-4 pr-48 bg-dark-bg border border-dark-border rounded-2xl text-dark-text placeholder-dark-text-secondary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                  disabled={isGenerating}
+                />
+                <select
+                   value={selectedModel}
+                   onChange={(e) => setSelectedModel(e.target.value)}
+                   className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-dark-bg border border-dark-border rounded-lg px-2 py-1 text-dark-text text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 cursor-pointer appearance-none"
+                   disabled={isGenerating}
+                   style={{
+                     backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                     backgroundPosition: 'right 0.5rem center',
+                     backgroundRepeat: 'no-repeat',
+                     backgroundSize: '1rem 1rem',
+                     paddingRight: '2rem'
+                   }}
+                 >
+                   {availableModels.map((model) => (
+                     <option key={model.id} value={model.id} className="bg-dark-bg text-dark-text">
+                       {model.name}
+                     </option>
+                   ))}
+                 </select>
+              </div>
               <button
                 onClick={handleSendMessage}
                 disabled={isGenerating || !inputMessage.trim()}
-                className="px-6 py-2 bg-primary hover:bg-primary-hover disabled:bg-dark-bg-tertiary disabled:text-dark-text-secondary text-white rounded-2xl transition-all flex items-center gap-2 shadow-lg hover:shadow-xl"
+                className="px-4 py-4 bg-primary hover:bg-primary-hover disabled:bg-dark-bg-tertiary disabled:text-dark-text-secondary text-white rounded-2xl transition-all flex items-center justify-center shadow-lg hover:shadow-xl"
               >
                 <Send className="w-5 h-5" />
-                {isGenerating ? 'Generating...' : 'Send'}
               </button>
             </div>
           </div>

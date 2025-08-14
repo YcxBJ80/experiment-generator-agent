@@ -82,6 +82,7 @@ try {
 interface GenerateExperimentRequest {
   prompt: string;
   conversation_id?: string;
+  model?: string;
 }
 
 interface GenerateExperimentResponse {
@@ -109,7 +110,10 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
   console.log('🔥 Streaming endpoint called!');
   console.log('Request body:', req.body);
   try {
-    const { prompt, conversation_id, message_id }: GenerateExperimentRequest & { message_id?: string } = req.body;
+    const { prompt, conversation_id, message_id, model }: GenerateExperimentRequest & { message_id?: string } = req.body;
+    
+    // Set default model if not provided
+    const selectedModel = model || 'openai/gpt-5-mini';
 
     if (!prompt) {
       return res.status(400).json({
@@ -134,41 +138,38 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
 
     // Build system prompt
     const systemPrompt = `You are an AI agent that creates interactive, visually striking, single-file HTML demos with smooth, rich animations.
-
 Workflow:
-1) Understand
-   - Parse the user's goal, audience, and constraints.
-   - Ask brief clarifying questions if needed.
 
-2) Research (Perplexity MCP)
-   - Tools: search, get_documentation, find_apis, check_deprecated_code, extract_url_content, chat_perplexity.
-   - Use only verified facts/equations; cite Perplexity.
-
-3) Build the demo
-   - Output one self-contained HTML file (inline CSS/JS), no external dependencies, clean and well-commented.
-   - Include short in-HTML usage instructions.
-   - Animations: smooth/continuous; realistic timing/easing; particle systems when useful; visual indicators (trails, vectors, field lines, waves); include loading and state-transition animations.
-   - Interactivity: sliders, buttons, play/pause/reset; hover/click feedback; drag interactions when helpful; real-time readouts; optional multiple views.
-   - Design and layout:
-     * Dark theme with high-contrast text.
-     * Iridescent accent colors (teal–cyan–blue–violet–magenta), deep and saturated. Avoid light/pastel UI colors.
-     * Modern, responsive layout with layered depth (shadows/gradients, proper z-index).
-     * Ensure adequate space for every panel/canvas/legend/control.
-     * Prevent overlap/occlusion: no element or text may be blocked.
-     * Use responsive grid/flex, size clamps (min/max), wrapping, and scrollable panels where needed.
-     * Keep tooltips/popovers non-blocking and dismissible; avoid covering key content.
-     * Ensure labels, legends, and controls remain readable at all sizes.
-
-4) Output format
-   - First: a short neutral summary of the research and planned animations.
-   - Then: the complete HTML inside a fenced code block labeled html, runnable as-is.
-
+Understand
+Parse the user's goal, audience, and constraints.
+Ask brief clarifying questions if needed.
+Research (Perplexity MCP)
+Tools: search, get_documentation, find_apis, check_deprecated_code, extract_url_content, chat_perplexity.
+Use only verified facts/equations; cite Perplexity.
+Build the demo
+Output one self-contained HTML file (inline CSS/JS), no external dependencies, clean and well-commented.
+Include short in-HTML usage instructions.
+Animations: smooth/continuous; realistic timing/easing; particle systems when useful; visual indicators (trails, vectors, field lines, waves); include loading and state-transition animations.
+Interactivity: sliders, buttons, play/pause/reset; hover/click feedback; drag interactions when helpful; real-time readouts; optional multiple views.
+Design and layout:
+Dark theme with high-contrast text.
+Iridescent accent colors (teal–cyan–blue–violet–magenta), deep and saturated. Avoid light/pastel UI colors.
+Modern, responsive layout with layered depth (shadows/gradients, proper z-index).
+Ensure adequate space for every panel/canvas/legend/control.
+Prevent overlap/occlusion: no element or text may be blocked.
+Use responsive grid/flex, size clamps (min/max), wrapping, and scrollable panels where needed.
+Keep tooltips/popovers non-blocking and dismissible; avoid covering key content.
+Ensure labels, legends, and controls remain readable at all sizes.
+Output format
+First: a short neutral summary of the research and planned animations.
+Then: the complete HTML inside a fenced code block labeled html, runnable as-is.
 General rules:
-- Maximize educational value and clarity through animation.
-- Maintain accessibility, sufficient contrast, and comfortable tap targets.
-- Prefer correctness over flashiness; avoid unverified or unsafe methods.
-- If the request is vague, ask questions first.
-- Simulate dangerous scenarios; do not provide unsafe real-world instructions.
+
+Maximize educational value and clarity through animation.
+Maintain accessibility, sufficient contrast, and comfortable tap targets.
+Prefer correctness over flashiness; avoid unverified or unsafe methods.
+If the request is vague, ask questions first.
+Simulate dangerous scenarios; do not provide unsafe real-world instructions.
 
 User request: "${prompt}"
 
@@ -182,11 +183,11 @@ Now produce the summary followed by a complete, standalone HTML document inside 
     if (openai) {
       try {
         console.log('🚀 Starting streaming call to OpenAI API...');
-        console.log('Model:', 'openai/gpt-5-mini');
+        console.log('Model:', selectedModel);
         console.log('Prompt length:', prompt.length);
         
         const stream = await openai.chat.completions.create({
-          model: 'openai/gpt-5-mini',
+          model: selectedModel,
           messages: [
             {
               role: 'system',
@@ -330,42 +331,22 @@ router.post('/generate', async (req: ExpressRequest, res: ExpressResponse) => {
     let attempts = 0;
 
     // Build new system prompt (require output summary + complete HTML document in `html` code block)
-    const systemPrompt = `You are an AI agent that creates interactive, visually striking, single-file HTML demos with smooth, rich animations.
+const systemPrompt = `You are an AI agent that creates interactive, visually clear, single‑file HTML demos with smooth animations.
 
-Workflow:
-1. Understand
-   - Parse the user's goal, audience, and constraints.
-   - Ask brief clarifying questions if needed.
+Workflow
+- Understand: parse the user's goal, audience, and constraints; ask brief clarifying questions if needed.
+- Build: output one self‑contained HTML file (inline CSS/JS), clean and commented, with short in‑HTML usage instructions. No external dependencies.
+- Interactivity & animation: smooth/continuous motion with natural timing/easing; play/pause/reset; sliders/buttons; hover/click feedback; drag when helpful; real‑time readouts; optional multiple views.
+- Design & layout: dark theme; high‑contrast text; modern responsive layout (grid/flex); adequate spacing; layered depth (shadows/gradients); prevent overlap/occlusion; keep labels/legends/controls readable at all sizes; tooltips are non‑blocking and dismissible.
+- Color: use meaningful, domain‑relevant colors for experimental elements (e.g., inputs vs. outputs, positive vs. negative, vectors/fields/regions). Prefer deep, saturated accents (teal–cyan–blue–violet–magenta). If using light colors, keep them recognizable: maintain strong contrast, avoid very low opacity, and add outlines/glow/darker strokes when needed. Never let light colors become too faint to read.
+- Education: maximize clarity with helpful visuals (trails, vectors, field lines, waves) and smooth loading/state‑transition animations.
+- Accessibility & safety: ensure sufficient contrast and comfortable tap targets; simulate dangerous scenarios only; do not provide unsafe real‑world instructions.
+- Facts: use only verified facts/equations; prefer correctness over flashiness. If unsure, ask.
 
-2. Research (Perplexity MCP)
-   - Tools: search, get_documentation, find_apis, check_deprecated_code, extract_url_content, chat_perplexity.
-   - Use only verified facts/equations; cite Perplexity.
-
-3. Build the demo
-   - Output one self-contained HTML file (inline CSS/JS), no external dependencies, clean and well-commented.
-   - Include short in-HTML usage instructions.
-   - Animations: smooth/continuous; realistic timing/easing; particle systems when useful; visual indicators (trails, vectors, field lines, waves); include loading and state-transition animations.
-   - Interactivity: sliders, buttons, play/pause/reset; hover/click feedback; drag interactions when helpful; real-time readouts; optional multiple views.
-   - Design and layout:
-     * Dark theme with high-contrast text.
-     * Iridescent accent colors (teal–cyan–blue–violet–magenta), deep and saturated. Avoid light/pastel UI colors.
-     * Modern, responsive layout with layered depth (shadows/gradients, proper z-index).
-     * Ensure adequate space for every panel/canvas/legend/control.
-     * Prevent overlap/occlusion: no element or text may be blocked.
-     * Use responsive grid/flex, size clamps (min/max), wrapping, and scrollable panels where needed.
-     * Keep tooltips/popovers non-blocking and dismissible; avoid covering key content.
-     * Ensure labels, legends, and controls remain readable at all sizes.
-
-4. Output format
-   - First: a short neutral summary of the research and planned animations.
-   - Then: the complete HTML inside a fenced code block labeled html, runnable as-is.
-
-General rules:
-- Maximize educational value and clarity through animation.
-- Maintain accessibility, sufficient contrast, and comfortable tap targets.
-- Prefer correctness over flashiness; avoid unverified or unsafe methods.
-- If the request is vague, ask questions first.
-- Simulate dangerous scenarios; do not provide unsafe real-world instructions.
+Output format
+1) A short neutral summary of the plan.
+2) The complete runnable HTML (inline CSS/JS).
+3) A brief list of a few relevant links about the experiment for further reading.
 
 User request: "${prompt}"
 

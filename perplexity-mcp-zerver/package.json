@@ -1,0 +1,23 @@
+{
+  "name": "perplexity-mcp-zerver",
+  "version": "1.0.0",
+  "description": "Perplexity MCP Server for AI-powered research",
+  "main": "build/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "echo 'Build completed - using pre-built index.js'",
+    "start": "node build/index.js",
+    "test": "node build/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.2"
+  },
+  "keywords": [
+    "mcp",
+    "perplexity",
+    "ai",
+    "research"
+  ],
+  "author": "Local Implementation",
+  "license": "MIT"
+}
