@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { perplexityMCPClient } from '../lib/perplexityMcpClient.js';
-import { JavaScriptValidator } from '../lib/jsValidator.js';
+import { JavaScriptValidator, CodeLinter, LinterResult } from '../lib/jsValidator.js';
 import { DatabaseService } from '../lib/supabase.js';
 
 // Ensure environment variables are loaded
@@ -113,7 +113,7 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
     const { prompt, conversation_id, message_id, model }: GenerateExperimentRequest & { message_id?: string } = req.body;
     
     // Set default model if not provided
-    const selectedModel = model || 'openai/gpt-5-mini';
+    const selectedModel = model || 'moonshotai/kimi-k2';
 
     if (!prompt) {
       return res.status(400).json({
@@ -137,39 +137,100 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
     console.log('Perplexity knowledge acquisition completed');
 
     // Build system prompt
-    const systemPrompt = `You are an AI agent that creates interactive, visually striking, single-file HTML demos with smooth, rich animations.
-Workflow:
+    const systemPrompt = `You are an AI agent specialized in creating highly interactive and visually stunning HTML-based experiment demos with rich animations and dynamic visualizations.
 
-Understand
-Parse the user's goal, audience, and constraints.
-Ask brief clarifying questions if needed.
-Research (Perplexity MCP)
-Tools: search, get_documentation, find_apis, check_deprecated_code, extract_url_content, chat_perplexity.
-Use only verified facts/equations; cite Perplexity.
-Build the demo
-Output one self-contained HTML file (inline CSS/JS), no external dependencies, clean and well-commented.
-Include short in-HTML usage instructions.
-Animations: smooth/continuous; realistic timing/easing; particle systems when useful; visual indicators (trails, vectors, field lines, waves); include loading and state-transition animations.
-Interactivity: sliders, buttons, play/pause/reset; hover/click feedback; drag interactions when helpful; real-time readouts; optional multiple views.
-Design and layout:
-Dark theme with high-contrast text.
-Iridescent accent colors (teal–cyan–blue–violet–magenta), deep and saturated. Avoid light/pastel UI colors.
-Modern, responsive layout with layered depth (shadows/gradients, proper z-index).
-Ensure adequate space for every panel/canvas/legend/control.
-Prevent overlap/occlusion: no element or text may be blocked.
-Use responsive grid/flex, size clamps (min/max), wrapping, and scrollable panels where needed.
-Keep tooltips/popovers non-blocking and dismissible; avoid covering key content.
-Ensure labels, legends, and controls remain readable at all sizes.
-Output format
-First: a short neutral summary of the research and planned animations.
-Then: the complete HTML inside a fenced code block labeled html, runnable as-is.
-General rules:
 
-Maximize educational value and clarity through animation.
-Maintain accessibility, sufficient contrast, and comfortable tap targets.
-Prefer correctness over flashiness; avoid unverified or unsafe methods.
-If the request is vague, ask questions first.
-Simulate dangerous scenarios; do not provide unsafe real-world instructions.
+You follow this pipeline for every request:
+
+
+1. Understand User Request
+   - Carefully interpret the user's described experiment or concept.
+   - Ask clarifying questions if needed to ensure full understanding of the user's goal, audience, and constraints.
+
+
+2. Information Gathering via Perplexity MCP
+   - Use the Perplexity MCP tools to find accurate and relevant information about the experiment.
+   - Available Perplexity MCP tools:
+     * search: Execute search queries on Perplexity.ai with brief/normal/detailed response types
+     * get_documentation: Request documentation and examples for technologies/libraries
+     * find_apis: Find and evaluate APIs based on requirements and context
+     * check_deprecated_code: Analyze code snippets for deprecated features
+     * extract_url_content: Extract main article content from URLs using browser automation
+     * chat_perplexity: Maintain continuous conversation with Perplexity AI
+   - Summarize key concepts, physical principles, equations, or historical background necessary for the demo.
+   - Only use verified, factual information and cite Perplexity as the source.
+
+3. Interactive HTML Demo Creation with Rich Animations
+   - Generate a self-contained HTML file with embedded JavaScript and CSS as needed.
+   - LAYOUT REQUIREMENTS (CRITICAL):
+     * Use a two-column layout: LEFT side for demo visualization, RIGHT side for controls and information
+     * Left column (60-70% width): Main demo area with animations and visualizations
+     * Right column (30-40% width): Parameter controls, sliders, formulas, historical background, and additional information
+     * Ensure responsive design that adapts to different screen sizes
+     * Use flexbox or CSS Grid for proper layout structure
+   - ANIMATION REQUIREMENTS (CRITICAL):
+     * Include smooth, continuous animations that illustrate the core concepts
+     * Add particle systems where relevant (e.g., air molecules for Bernoulli's principle, electrons for circuits, atoms for chemical reactions)
+     * The components that are crucial for the demo should be is different color than the background (normally dark colors)
+     * Use CSS animations, transitions, and JavaScript-driven animations extensively
+     * Create visual feedback for all user interactions (hover effects, click animations, parameter changes)
+     * Implement realistic physics simulations with proper timing and easing
+     * Add visual indicators like trails, paths, force vectors, field lines, or wave propagations
+     * Use color changes, size variations, and movement to show state changes
+     * Include loading animations and smooth transitions between different states
+   
+   - SPECIFIC ANIMATION EXAMPLES TO IMPLEMENT:
+     * For fluid dynamics: flowing particles, pressure visualization, streamlines
+     * For mechanics: moving objects with trails, force vectors, energy transformations
+     * For electricity: flowing electrons, field visualizations, sparks and glows
+     * For chemistry: molecular movements, bond formations/breaking, reaction progress
+     * For optics: light rays, wave propagations, interference patterns
+     * For thermodynamics: particle motion speed changes, heat flow visualization
+   
+   - INTERACTIVITY REQUIREMENTS:
+     * RIGHT 1/5 SIDE PANEL must include:
+       - Parameter adjustment sliders with real-time value display
+       - Mathematical formulas and equations related to the concept
+       - Historical background and interesting facts
+       - Real-time calculations and measurements display
+       - Play/pause/reset controls for animations
+       - Speed control for animations
+       - Different viewing modes or simulation presets
+     * LEFT 4/5 SIDE DEMO must include:
+       - Main visualization area with smooth animations
+       - Hover effects that reveal additional information
+       - Click-and-drag interactions where appropriate
+       - Visual feedback for parameter changes
+       - Clear labels and measurement indicators
+   
+   - VISUAL DESIGN REQUIREMENTS:
+     * Use modern, clean design with subtle shadows and gradients
+     * Implement responsive layouts that work on different screen sizes
+     * Add visual depth with layered elements and proper z-indexing
+     * Use consistent color schemes that enhance understanding
+     * Include clear labels, legends, and measurement displays
+   
+   - The code should be clean, well-commented, and runnable as-is with no external dependencies.
+   - Provide clear instructions for how to use the demo within the HTML.
+   - IMPORTANT STYLING REQUIREMENTS:
+     * ALL text content must use dark colors (e.g., #000000, #333333, #2d3748, #1a202c, or other dark shades)
+     * ALL backgrounds must use light colors (e.g., #ffffff, #f7fafc, #edf2f7, #e2e8f0, or other light shades)
+     * Ensure sufficient contrast between text and background for readability
+     * Apply these color constraints to all elements including buttons, labels, headings, and body text
+
+4. Output Format
+   - First, present a short summary of the gathered information and the animations you will include.
+   - Then, output the complete HTML code inside a fenced code block labeled with \`html\`.
+   - Make sure the code is correct and free of syntax errors.
+
+General Rules:
+- Always aim for maximum visual impact and educational value through animations.
+- Prioritize smooth, realistic animations that enhance understanding.
+- Keep accessibility and clear visualization in mind.
+- Avoid unverified or unsafe algorithms/experiments.
+- Use neutral and factual tone in summaries.
+- If the request is vague, ask questions before starting.
+- If something is physically dangerous, simulate it safely instead of providing real-life unsafe instructions.
 
 User request: "${prompt}"
 
@@ -331,22 +392,100 @@ router.post('/generate', async (req: ExpressRequest, res: ExpressResponse) => {
     let attempts = 0;
 
     // Build new system prompt (require output summary + complete HTML document in `html` code block)
-const systemPrompt = `You are an AI agent that creates interactive, visually clear, single‑file HTML demos with smooth animations.
+const systemPrompt = `You are an AI agent specialized in creating highly interactive and visually stunning HTML-based experiment demos with rich animations and dynamic visualizations.
 
-Workflow
-- Understand: parse the user's goal, audience, and constraints; ask brief clarifying questions if needed.
-- Build: output one self‑contained HTML file (inline CSS/JS), clean and commented, with short in‑HTML usage instructions. No external dependencies.
-- Interactivity & animation: smooth/continuous motion with natural timing/easing; play/pause/reset; sliders/buttons; hover/click feedback; drag when helpful; real‑time readouts; optional multiple views.
-- Design & layout: dark theme; high‑contrast text; modern responsive layout (grid/flex); adequate spacing; layered depth (shadows/gradients); prevent overlap/occlusion; keep labels/legends/controls readable at all sizes; tooltips are non‑blocking and dismissible.
-- Color: use meaningful, domain‑relevant colors for experimental elements (e.g., inputs vs. outputs, positive vs. negative, vectors/fields/regions). Prefer deep, saturated accents (teal–cyan–blue–violet–magenta). If using light colors, keep them recognizable: maintain strong contrast, avoid very low opacity, and add outlines/glow/darker strokes when needed. Never let light colors become too faint to read.
-- Education: maximize clarity with helpful visuals (trails, vectors, field lines, waves) and smooth loading/state‑transition animations.
-- Accessibility & safety: ensure sufficient contrast and comfortable tap targets; simulate dangerous scenarios only; do not provide unsafe real‑world instructions.
-- Facts: use only verified facts/equations; prefer correctness over flashiness. If unsure, ask.
 
-Output format
-1) A short neutral summary of the plan.
-2) The complete runnable HTML (inline CSS/JS).
-3) A brief list of a few relevant links about the experiment for further reading.
+You follow this pipeline for every request:
+
+
+1. Understand User Request
+   - Carefully interpret the user's described experiment or concept.
+   - Ask clarifying questions if needed to ensure full understanding of the user's goal, audience, and constraints.
+
+
+2. Information Gathering via Perplexity MCP
+   - Use the Perplexity MCP tools to find accurate and relevant information about the experiment.
+   - Available Perplexity MCP tools:
+     * search: Execute search queries on Perplexity.ai with brief/normal/detailed response types
+     * get_documentation: Request documentation and examples for technologies/libraries
+     * find_apis: Find and evaluate APIs based on requirements and context
+     * check_deprecated_code: Analyze code snippets for deprecated features
+     * extract_url_content: Extract main article content from URLs using browser automation
+     * chat_perplexity: Maintain continuous conversation with Perplexity AI
+   - Summarize key concepts, physical principles, equations, or historical background necessary for the demo.
+   - Only use verified, factual information and cite Perplexity as the source.
+
+3. Interactive HTML Demo Creation with Rich Animations
+   - Generate a self-contained HTML file with embedded JavaScript and CSS as needed.
+   - LAYOUT REQUIREMENTS (CRITICAL):
+     * Use a two-column layout: LEFT side for demo visualization, RIGHT side for controls and information
+     * Left column (60-70% width): Main demo area with animations and visualizations
+     * Right column (30-40% width): Parameter controls, sliders, formulas, historical background, and additional information
+     * Ensure responsive design that adapts to different screen sizes
+     * Use flexbox or CSS Grid for proper layout structure
+   - ANIMATION REQUIREMENTS (CRITICAL):
+     * Include smooth, continuous animations that illustrate the core concepts
+     * Add particle systems where relevant (e.g., air molecules for Bernoulli's principle, electrons for circuits, atoms for chemical reactions)
+     * The components that are crucial for the demo should be is different color than the background (normally dark colors)
+     * Use CSS animations, transitions, and JavaScript-driven animations extensively
+     * Create visual feedback for all user interactions (hover effects, click animations, parameter changes)
+     * Implement realistic physics simulations with proper timing and easing
+     * Add visual indicators like trails, paths, force vectors, field lines, or wave propagations
+     * Use color changes, size variations, and movement to show state changes
+     * Include loading animations and smooth transitions between different states
+   
+   - SPECIFIC ANIMATION EXAMPLES TO IMPLEMENT:
+     * For fluid dynamics: flowing particles, pressure visualization, streamlines
+     * For mechanics: moving objects with trails, force vectors, energy transformations
+     * For electricity: flowing electrons, field visualizations, sparks and glows
+     * For chemistry: molecular movements, bond formations/breaking, reaction progress
+     * For optics: light rays, wave propagations, interference patterns
+     * For thermodynamics: particle motion speed changes, heat flow visualization
+   
+   - INTERACTIVITY REQUIREMENTS:
+     * RIGHT SIDE PANEL must include:
+       - Parameter adjustment sliders with real-time value display
+       - Mathematical formulas and equations related to the concept
+       - Historical background and interesting facts
+       - Real-time calculations and measurements display
+       - Play/pause/reset controls for animations
+       - Speed control for animations
+       - Different viewing modes or simulation presets
+     * LEFT SIDE DEMO must include:
+       - Main visualization area with smooth animations
+       - Hover effects that reveal additional information
+       - Click-and-drag interactions where appropriate
+       - Visual feedback for parameter changes
+       - Clear labels and measurement indicators
+   
+   - VISUAL DESIGN REQUIREMENTS:
+     * Use modern, clean design with subtle shadows and gradients
+     * Implement responsive layouts that work on different screen sizes
+     * Add visual depth with layered elements and proper z-indexing
+     * Use consistent color schemes that enhance understanding
+     * Include clear labels, legends, and measurement displays
+   
+   - The code should be clean, well-commented, and runnable as-is with no external dependencies.
+   - Provide clear instructions for how to use the demo within the HTML.
+   - IMPORTANT STYLING REQUIREMENTS:
+     * ALL text content must use dark colors (e.g., #000000, #333333, #2d3748, #1a202c, or other dark shades)
+     * ALL backgrounds must use light colors (e.g., #ffffff, #f7fafc, #edf2f7, #e2e8f0, or other light shades)
+     * Ensure sufficient contrast between text and background for readability
+     * Apply these color constraints to all elements including buttons, labels, headings, and body text
+
+4. Output Format
+   - First, present a short summary of the gathered information and the animations you will include.
+   - Then, output the complete HTML code inside a fenced code block labeled with \`html\`.
+   - Make sure the code is correct and free of syntax errors.
+
+General Rules:
+- Always aim for maximum visual impact and educational value through animations.
+- Prioritize smooth, realistic animations that enhance understanding.
+- Keep accessibility and clear visualization in mind.
+- Avoid unverified or unsafe algorithms/experiments.
+- Use neutral and factual tone in summaries.
+- If the request is vague, ask questions before starting.
+- If something is physically dangerous, simulate it safely instead of providing real-life unsafe instructions.
 
 User request: "${prompt}"
 
@@ -366,11 +505,11 @@ Now produce the summary followed by a complete, standalone HTML document inside 
         while (attempts < maxAttempts && !experimentData) {
           attempts++;
           console.log(`🚀 Attempt ${attempts} to call OpenAI API...`);
-          console.log('Model:', 'openai/gpt-5-mini');
+          console.log('Model:', 'moonshotai/kimi-k2');
           console.log('Prompt length:', prompt.length);
           
           const response = await openai.chat.completions.create({
-          model: 'openai/gpt-5-mini',
+          model: 'moonshotai/kimi-k2',
             messages: [
               {
                 role: 'system',
@@ -483,71 +622,74 @@ Now produce the summary followed by a complete, standalone HTML document inside 
                 }
               }
               
-              // Validate and clean JavaScript code
-              if (rawData.js_content) {
-                rawData.js_content = validateAndCleanJavaScript(rawData.js_content);
-                
-                // Use new syntax checker
-                const validationResult = JavaScriptValidator.validateSyntax(rawData.js_content);
-                
-                if (!validationResult.isValid) {
-                  console.log(`Code generated in attempt ${attempts} has syntax errors:`, validationResult.errors);
-                  
-                  if (attempts < maxAttempts) {
-                    // Generate fix prompt
-                    const fixPrompt = JavaScriptValidator.generateFixPrompt(rawData.js_content, validationResult);
-                    
-                    console.log('Attempting to have model fix syntax errors...');
-                    const fixCompletion = await openai.chat.completions.create({
-                      model: 'openai/gpt-5-mini',
-                      messages: [
-                        { role: 'system', content: 'You are a JavaScript code fixing expert. Please fix the syntax errors in the provided code.' },
-                        { role: 'user', content: fixPrompt }
-                      ],
-                      temperature: 0.3,
-                      max_tokens: 40000
-                    });
-                    
-                    const fixedResponse = fixCompletion.choices[0]?.message?.content;
-                    if (fixedResponse) {
-                      // Extract fixed JavaScript code
-                      const codeMatch = fixedResponse.match(/```(?:javascript)?\n([\s\S]*?)\n```/);
-                      if (codeMatch) {
-                        rawData.js_content = codeMatch[1].trim();
-                        
-                        // Re-validate the fixed code
-                        const revalidationResult = JavaScriptValidator.validateSyntax(rawData.js_content);
-                        if (revalidationResult.isValid) {
-                          console.log('Code fix successful!');
-                          experimentData = rawData;
-                        } else {
-                          console.log('Code fix failed, still has errors:', revalidationResult.errors);
-                          // If fix failed, use auto-fixed code
-                          if (revalidationResult.fixedCode) {
-                            rawData.js_content = revalidationResult.fixedCode;
-                            experimentData = rawData;
-                            console.log('Using auto-fixed code');
-                          }
-                        }
-                      }
-                    }
-                  } else {
-                    // Last attempt, use auto-fix
-                    if (validationResult.fixedCode) {
-                      rawData.js_content = validationResult.fixedCode;
-                      experimentData = rawData;
-                      console.log('Using auto-fixed code as final result');
-                    } else {
-                      throw new Error(`Generated JavaScript code has unfixable syntax errors: ${validationResult.errors.join(', ')}`);
-                    }
-                  }
-                } else {
-                  console.log('Code syntax check passed!');
-                  experimentData = rawData;
-                }
-              } else {
-                experimentData = rawData;
-              }
+              // 全面的代码验证和修复
+               const fullHtmlContent = combineCodeSections(rawData.html_content || '', rawData.css_content || '', rawData.js_content || '');
+               const { htmlContent, cssContent, jsContent } = extractCodeSections(fullHtmlContent);
+               
+               // 使用新的 CodeLinter 进行全面检查
+               const linterResult: LinterResult = CodeLinter.lintCode(htmlContent, cssContent, jsContent);
+               
+               if (!linterResult.overall.isValid) {
+                 console.log(`Code generated in attempt ${attempts} has ${linterResult.overall.totalErrors} errors`);
+                 console.log('HTML errors:', linterResult.html.errors);
+                 console.log('CSS errors:', linterResult.css.errors);
+                 console.log('JavaScript errors:', linterResult.js.errors);
+                 
+                 if (attempts < maxAttempts) {
+                   // 尝试使用模型修复所有错误
+                   try {
+                     const fixPrompt = generateComprehensiveFixPrompt(linterResult, fullHtmlContent);
+                     
+                     console.log('Attempting to have model fix all code errors...');
+                     const fixCompletion = await openai.chat.completions.create({
+                       model: selectedModel,
+                       messages: [
+                         {
+                           role: 'system',
+                           content: 'You are a code fixer that can fix HTML, CSS, and JavaScript errors. Return only the corrected complete HTML code with embedded CSS and JavaScript, without any explanations or markdown formatting.'
+                         },
+                         {
+                           role: 'user',
+                           content: fixPrompt
+                         }
+                       ],
+                       temperature: 0.1,
+                       max_tokens: 4000
+                     });
+                     
+                     const fixedResponse = fixCompletion.choices[0]?.message?.content;
+                     if (fixedResponse) {
+                       // 验证修复后的代码
+                       const { htmlContent: fixedHtml, cssContent: fixedCss, jsContent: fixedJs } = extractCodeSections(fixedResponse);
+                       const revalidationResult = CodeLinter.lintCode(fixedHtml, fixedCss, fixedJs);
+                       
+                       if (revalidationResult.overall.isValid || revalidationResult.overall.totalErrors < linterResult.overall.totalErrors) {
+                         // 更新修复后的代码
+                         rawData.html_content = fixedHtml;
+                         rawData.css_content = fixedCss;
+                         rawData.js_content = fixedJs;
+                         experimentData = rawData;
+                         console.log('Code fixed successfully by model');
+                       } else {
+                         console.log('Model fix did not improve code quality, using auto-fix');
+                         experimentData = applyAutoFixesToRawData(rawData, linterResult);
+                       }
+                     } else {
+                       experimentData = applyAutoFixesToRawData(rawData, linterResult);
+                     }
+                   } catch (fixError) {
+                     console.error('Error fixing code with model:', fixError);
+                     experimentData = applyAutoFixesToRawData(rawData, linterResult);
+                   }
+                 } else {
+                   // 最后一次尝试，使用自动修复
+                   experimentData = applyAutoFixesToRawData(rawData, linterResult);
+                   console.log('Using auto-fixed code as final result');
+                 }
+               } else {
+                 console.log('Code validation passed - no errors found');
+                 experimentData = rawData;
+               }
               
               console.log('✅ JSON parsing successful');
             } catch (parseError) {
@@ -665,5 +807,63 @@ router.get('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
     });
   }
 });
+
+/**
+ * Extract code sections from HTML content
+ */
+function extractCodeSections(html: string): { htmlContent: string, cssContent: string, jsContent: string } {
+  // Extract CSS from <style> tags
+  const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+  const styleMatches = html.match(styleRegex);
+  const cssContent = styleMatches ? styleMatches.map(match => {
+    const codeMatch = match.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+    return codeMatch ? codeMatch[1] : '';
+  }).join('\n') : '';
+  
+  // Extract JavaScript from <script> tags
+  const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+  const scriptMatches = html.match(scriptRegex);
+  const jsContent = scriptMatches ? scriptMatches.map(match => {
+    const codeMatch = match.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+    return codeMatch ? codeMatch[1] : '';
+  }).join('\n') : '';
+  
+  // Extract HTML content (remove <style> and <script> tags)
+  let htmlContent = html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .trim();
+  
+  return { htmlContent, cssContent, jsContent };
+}
+
+/**
+ * Combine code sections into complete HTML
+ */
+function combineCodeSections(htmlContent: string, cssContent: string, jsContent: string): string {
+  let combined = htmlContent;
+  
+  if (cssContent) {
+    // Add CSS in <style> tag
+    const styleTag = `<style>\n${cssContent}\n</style>`;
+    if (combined.includes('<head>')) {
+      combined = combined.replace('<head>', `<head>\n${styleTag}`);
+    } else {
+      combined = `${styleTag}\n${combined}`;
+    }
+  }
+  
+  if (jsContent) {
+    // Add JavaScript in <script> tag
+    const scriptTag = `<script>\n${jsContent}\n</script>`;
+    if (combined.includes('</body>')) {
+      combined = combined.replace('</body>', `${scriptTag}\n</body>`);
+    } else {
+      combined = `${combined}\n${scriptTag}`;
+    }
+  }
+  
+  return combined;
+}
 
 export default router;

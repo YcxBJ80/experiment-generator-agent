@@ -28,7 +28,7 @@ function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('openai/gpt-5-mini');
+  const [selectedModel, setSelectedModel] = useState('openai/gpt-5');
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -36,13 +36,17 @@ function Home() {
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   // 滚动到底部按钮状态
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  // 搜索生成状态
+  const [isSearchingGenerating, setIsSearchingGenerating] = useState(false);
 
   // 可选择的模型列表
   const availableModels = [
-    { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini' },
-    { id: 'qwen/qwen3-coder', name: 'Qwen3 Coder' },
+    { id: 'anthropic/claude-sonnet-4', name: 'Claude 4 Sonnet' },
     { id: 'moonshotai/kimi-k2', name: 'Kimi K2' },
-    { id: 'google/gemini-2.5-pro', name: 'Gemini 2.5 Pro' }
+    { id: 'qwen/qwen3-coder', name: 'Qwen3 Coder' },
+    { id: 'openai/gpt-5', name: 'GPT-5' },
+    { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini' },
+    { id: 'google/gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
   ];
 
   // 加载对话历史
@@ -207,6 +211,7 @@ function Home() {
     const messageContent = inputMessage;
     setInputMessage('');
     setIsGenerating(true);
+    setIsSearchingGenerating(true);
     
     try {
       // 保存用户消息到数据库
@@ -272,6 +277,7 @@ function Home() {
         
         // 调用流式API生成实验
         let hasStartedExperimentIdCheck = false;
+        let isFirstChunk = true;
          await apiClient.generateExperimentStream(
            {
              prompt: messageContent,
@@ -280,6 +286,12 @@ function Home() {
              model: selectedModel
            },
            (chunk: string) => {
+             // 收到第一个 chunk 时隐藏 "Searching & Generating" 状态
+             if (isFirstChunk) {
+               setIsSearchingGenerating(false);
+               isFirstChunk = false;
+             }
+             
              // 实时更新消息内容
              setConversations(prev => prev.map(conv => 
                conv.id === currentConversation 
@@ -436,6 +448,7 @@ function Home() {
     } finally {
       setIsGenerating(false);
       setStreamingMessageId(null);
+      setIsSearchingGenerating(false);
     }
   };
 
@@ -554,9 +567,19 @@ function Home() {
                       }`}
                     >
                       <div className="whitespace-pre-wrap">
-                        {message.content}
-                        {(message.isTyping || streamingMessageId === message.id) && (
-                          <span className="inline-block w-2 h-5 bg-primary ml-1 animate-pulse"></span>
+                        {/* 显示 "Searching & Generating" 状态 */}
+                        {isSearchingGenerating && message.type === 'assistant' && streamingMessageId === message.id && !message.content ? (
+                          <div className="flex items-center gap-2 text-dark-text-secondary">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                            <span>Searching & Generating...</span>
+                          </div>
+                        ) : (
+                          <>
+                            {message.content}
+                            {(message.isTyping || streamingMessageId === message.id) && message.content && (
+                              <span className="inline-block w-2 h-5 bg-primary ml-1 animate-pulse"></span>
+                            )}
+                          </>
                         )}
                       </div>
                       

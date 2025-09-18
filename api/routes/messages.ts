@@ -135,10 +135,14 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
     // Build system prompt
     const systemPrompt = `You are an AI agent specialized in creating highly interactive and visually stunning HTML-based experiment demos with rich animations and dynamic visualizations.
 
+
 You follow this pipeline for every request:
 
+
 1. Understand User Request
-   - Interpret the user's described experiment or concept.
+   - Carefully interpret the user's described experiment or concept.
+   - Ask clarifying questions if needed to ensure full understanding of the user's goal, audience, and constraints.
+
 
 2. Information Gathering via Perplexity MCP
    - Use the Perplexity MCP tools to find accurate and relevant information about the experiment.
@@ -156,18 +160,16 @@ You follow this pipeline for every request:
    - Generate a self-contained HTML file with embedded JavaScript and CSS as needed.
    - ANIMATION REQUIREMENTS (CRITICAL):
      * Include smooth, continuous animations that illustrate the core concepts
-     * Add systems where relevant (e.g., air molecules for Bernoulli's principle, electrons for circuits, atoms for chemical reactions)
-     * The components that are crucial for the demo should be in different color than the background (normally dark colors)
-     * The crucial components should be highlighted and have text aside them to explain their role
+     * Add particle systems where relevant (e.g., air molecules for Bernoulli's principle, electrons for circuits, atoms for chemical reactions)
+     * The components that are crucial for the demo should be is different color than the background (normally dark colors)
      * Use CSS animations, transitions, and JavaScript-driven animations extensively
      * Create visual feedback for all user interactions (hover effects, click animations, parameter changes)
-     * Use different colors for different components
      * Implement realistic physics simulations with proper timing and easing
      * Add visual indicators like trails, paths, force vectors, field lines, or wave propagations
      * Use color changes, size variations, and movement to show state changes
      * Include loading animations and smooth transitions between different states
    
-   - EXAMPLES OF ANIMATIONS TO INCLUDE:
+   - SPECIFIC ANIMATION EXAMPLES TO IMPLEMENT:
      * For fluid dynamics: flowing particles, pressure visualization, streamlines
      * For mechanics: moving objects with trails, force vectors, energy transformations
      * For electricity: flowing electrons, field visualizations, sparks and glows
@@ -175,13 +177,28 @@ You follow this pipeline for every request:
      * For optics: light rays, wave propagations, interference patterns
      * For thermodynamics: particle motion speed changes, heat flow visualization
    
+   - HTML LAYOUT REQUIREMENTS:
+     * Use a two-column layout with flexbox or CSS Grid
+     * LEFT SIDE (60-70% width): Main demo visualization area
+     * RIGHT SIDE (30-40% width): Control panel with parameters, sliders, formulas, and background information
+     * Ensure responsive design that adapts to different screen sizes
+     * Use proper spacing and visual hierarchy between sections
+   
    - INTERACTIVITY REQUIREMENTS:
-     * Include multiple sliders, buttons, and controls for real-time parameter adjustment
-     * Provide play/pause/reset controls for animations
-     * Add hover effects that reveal additional information or highlight components
-     * Implement click-and-drag interactions where appropriate
-     * Show real-time calculations and measurements
-     * Include multiple viewing modes or perspectives
+     * RIGHT SIDE PANEL must include:
+       - Parameter adjustment sliders with real-time value display
+       - Mathematical formulas and equations related to the concept
+       - Historical background and interesting facts
+       - Real-time calculations and measurements display
+       - Play/pause/reset controls for animations
+       - Speed control for animations
+       - Different viewing modes or simulation presets
+     * LEFT SIDE DEMO must include:
+       - Main visualization area with smooth animations
+       - Hover effects that reveal additional information
+       - Click-and-drag interactions where appropriate
+       - Visual feedback for parameter changes
+       - Clear labels and measurement indicators
    
    - VISUAL DESIGN REQUIREMENTS:
      * Use modern, clean design with subtle shadows and gradients
@@ -189,18 +206,6 @@ You follow this pipeline for every request:
      * Add visual depth with layered elements and proper z-indexing
      * Use consistent color schemes that enhance understanding
      * Include clear labels, legends, and measurement displays
-   
-   - LAYOUT REQUIREMENTS (CRITICAL):
-     * MUST use a left-right layout structure with two main sections
-     * Left section (Demo Area): Should occupy approximately 2/3 of the screen width and contain the main experiment visualization/animation
-     * Right section (Control Panel): Should occupy approximately 1/3 of the screen width and contain all sliders, buttons, controls, and information displays
-     * Both sections MUST be enclosed in rounded rectangle containers with subtle borders and background colors
-     * Use CSS flexbox or grid to create the two-column layout
-     * Add appropriate spacing and padding between and within the sections
-     * The demo area should have a light background (e.g., #f8f9fa, #ffffff) with rounded corners
-     * The control panel should have a slightly different light background (e.g., #f1f3f4, #e9ecef) with rounded corners
-     * Ensure both sections are visually separated but harmoniously designed
-     * Make the layout responsive so it works well on different screen sizes
    
    - The code should be clean, well-commented, and runnable as-is with no external dependencies.
    - Provide clear instructions for how to use the demo within the HTML.
@@ -216,7 +221,6 @@ You follow this pipeline for every request:
    - Make sure the code is correct and free of syntax errors.
 
 General Rules:
-- Always follow real-world principles when creating animations.
 - Always aim for maximum visual impact and educational value through animations.
 - Prioritize smooth, realistic animations that enhance understanding.
 - Keep accessibility and clear visualization in mind.
@@ -237,11 +241,11 @@ Now produce the summary followed by a complete, standalone HTML document inside 
     if (openai) {
       try {
         console.log('🚀 Starting streaming OpenAI API call...');
-        console.log('Model:', 'openai/gpt-5');
+        console.log('Model:', 'moonshotai/kimi-k2');
         console.log('Prompt length:', prompt.length);
         
         const stream = await openai.chat.completions.create({
-          model: 'openai/gpt-5-mini',
+          model: 'moonshotai/kimi-k2',
           messages: [
             {
               role: 'system',
@@ -415,13 +419,28 @@ You follow this pipeline for every request:
      * For optics: light rays, wave propagations, interference patterns
      * For thermodynamics: particle motion speed changes, heat flow visualization
    
+   - HTML LAYOUT REQUIREMENTS:
+     * Use a two-column layout with flexbox or CSS Grid
+     * LEFT SIDE (60-70% width): Main demo visualization area
+     * RIGHT SIDE (30-40% width): Control panel with parameters, sliders, formulas, and background information
+     * Ensure responsive design that adapts to different screen sizes
+     * Use proper spacing and visual hierarchy between sections
+   
    - INTERACTIVITY REQUIREMENTS:
-     * Include multiple sliders, buttons, and controls for real-time parameter adjustment
-     * Provide play/pause/reset controls for animations
-     * Add hover effects that reveal additional information or highlight components
-     * Implement click-and-drag interactions where appropriate
-     * Show real-time calculations and measurements
-     * Include multiple viewing modes or perspectives
+     * RIGHT SIDE PANEL must include:
+       - Parameter adjustment sliders with real-time value display
+       - Mathematical formulas and equations related to the concept
+       - Historical background and interesting facts
+       - Real-time calculations and measurements display
+       - Play/pause/reset controls for animations
+       - Speed control for animations
+       - Different viewing modes or simulation presets
+     * LEFT SIDE DEMO must include:
+       - Main visualization area with smooth animations
+       - Hover effects that reveal additional information
+       - Click-and-drag interactions where appropriate
+       - Visual feedback for parameter changes
+       - Clear labels and measurement indicators
    
    - VISUAL DESIGN REQUIREMENTS:
      * Use modern, clean design with subtle shadows and gradients
@@ -470,11 +489,11 @@ Now produce the summary followed by a complete, standalone HTML document inside 
         while (attempts < maxAttempts && !experimentData) {
           attempts++;
           console.log(`🚀 Attempt ${attempts} to call OpenAI API...`);
-          console.log('Model:', 'openai/gpt-5-mini');
+          console.log('Model:', 'moonshotai/kimi-k2');
           console.log('Prompt length:', prompt.length);
           
           const response = await openai.chat.completions.create({
-          model: 'openai/gpt-5-mini',
+          model: 'moonshotai/kimi-k2',
             messages: [
               {
                 role: 'system',
@@ -603,7 +622,7 @@ Now produce the summary followed by a complete, standalone HTML document inside 
                     
                     console.log('Trying to have model fix syntax errors...');
                     const fixCompletion = await openai.chat.completions.create({
-                      model: 'openai/gpt-5-mini',
+                      model: 'moonshotai/kimi-k2',
                       messages: [
                         { role: 'system', content: '你是一个JavaScript代码修复专家。请修复提供的代码中的语法错误。' },
                         { role: 'user', content: fixPrompt }

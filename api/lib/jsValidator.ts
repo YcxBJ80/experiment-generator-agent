@@ -1,6 +1,6 @@
 /**
- * JavaScript syntax checker
- * Used to detect and fix common JavaScript syntax errors
+ * Code syntax checker for HTML, CSS, and JavaScript
+ * Used to detect and fix common syntax errors in generated code
  */
 
 export interface ValidationResult {
@@ -8,6 +8,323 @@ export interface ValidationResult {
   errors: string[];
   fixedCode?: string;
   suggestions: string[];
+}
+
+export interface LinterResult {
+  html: ValidationResult;
+  css: ValidationResult;
+  js: ValidationResult;
+  overall: {
+    isValid: boolean;
+    totalErrors: number;
+    fixedHtml?: string;
+    fixedCss?: string;
+    fixedJs?: string;
+  };
+}
+
+export class CodeLinter {
+  
+  /**
+   * Comprehensive linter check for HTML, CSS, and JavaScript
+   */
+  static lintCode(htmlContent: string, cssContent: string, jsContent: string): LinterResult {
+    const htmlResult = this.validateHTML(htmlContent);
+    const cssResult = this.validateCSS(cssContent);
+    const jsResult = this.validateSyntax(jsContent);
+    
+    const totalErrors = htmlResult.errors.length + cssResult.errors.length + jsResult.errors.length;
+    
+    return {
+      html: htmlResult,
+      css: cssResult,
+      js: jsResult,
+      overall: {
+        isValid: totalErrors === 0,
+        totalErrors,
+        fixedHtml: htmlResult.fixedCode,
+        fixedCss: cssResult.fixedCode,
+        fixedJs: jsResult.fixedCode
+      }
+    };
+  }
+  
+  /**
+   * Validate HTML content
+   */
+  static validateHTML(html: string): ValidationResult {
+    const errors: string[] = [];
+    const suggestions: string[] = [];
+    let fixedCode = html;
+    
+    // Check for unclosed tags
+    const tagResult = this.checkHTMLTags(html);
+    if (!tagResult.isValid) {
+      errors.push(...tagResult.errors);
+      suggestions.push(...tagResult.suggestions);
+      fixedCode = tagResult.fixedCode || fixedCode;
+    }
+    
+    // Check for invalid attributes
+    const attrResult = this.checkHTMLAttributes(html);
+    if (!attrResult.isValid) {
+      errors.push(...attrResult.errors);
+      suggestions.push(...attrResult.suggestions);
+      fixedCode = attrResult.fixedCode || fixedCode;
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors,
+      fixedCode: errors.length > 0 ? fixedCode : undefined,
+      suggestions
+    };
+  }
+  
+  /**
+   * Validate CSS content
+   */
+  static validateCSS(css: string): ValidationResult {
+    const errors: string[] = [];
+    const suggestions: string[] = [];
+    let fixedCode = css;
+    
+    // Check for missing semicolons
+    const semicolonResult = this.checkCSSSemicolons(css);
+    if (!semicolonResult.isValid) {
+      errors.push(...semicolonResult.errors);
+      suggestions.push(...semicolonResult.suggestions);
+      fixedCode = semicolonResult.fixedCode || fixedCode;
+    }
+    
+    // Check for invalid property values
+    const propertyResult = this.checkCSSProperties(css);
+    if (!propertyResult.isValid) {
+      errors.push(...propertyResult.errors);
+      suggestions.push(...propertyResult.suggestions);
+      fixedCode = propertyResult.fixedCode || fixedCode;
+    }
+    
+    // Check for bracket matching
+    const bracketResult = this.checkCSSBrackets(css);
+    if (!bracketResult.isValid) {
+      errors.push(...bracketResult.errors);
+      suggestions.push(...bracketResult.suggestions);
+    }
+    
+    return {
+    isValid: errors.length === 0,
+    errors,
+    fixedCode: errors.length > 0 ? fixedCode : undefined,
+    suggestions
+  };
+}
+
+/**
+ * Check HTML tags for proper opening and closing
+ */
+static checkHTMLTags(html: string): ValidationResult {
+  const errors: string[] = [];
+  const suggestions: string[] = [];
+  let fixedCode = html;
+  
+  // Self-closing tags that don't need closing tags
+  const selfClosingTags = ['img', 'br', 'hr', 'input', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr'];
+  
+  // Find all opening tags
+  const openingTags = html.match(/<([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g) || [];
+  const closingTags = html.match(/<\/([a-zA-Z][a-zA-Z0-9]*)>/g) || [];
+  
+  const openStack: string[] = [];
+  const tagRegex = /<\/?([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g;
+  let match;
+  
+  while ((match = tagRegex.exec(html)) !== null) {
+    const tagName = match[1].toLowerCase();
+    const isClosing = match[0].startsWith('</');
+    const isSelfClosing = selfClosingTags.includes(tagName) || match[0].endsWith('/>');
+    
+    if (!isClosing && !isSelfClosing) {
+      openStack.push(tagName);
+    } else if (isClosing) {
+      if (openStack.length === 0) {
+        errors.push(`Closing tag </${tagName}> without matching opening tag`);
+        suggestions.push(`Remove the closing tag </${tagName}> or add an opening tag`);
+      } else {
+        const lastOpen = openStack.pop();
+        if (lastOpen !== tagName) {
+          errors.push(`Mismatched tags: expected </${lastOpen}> but found </${tagName}>`);
+          suggestions.push(`Change </${tagName}> to </${lastOpen}> or fix the tag structure`);
+        }
+      }
+    }
+  }
+  
+  // Check for unclosed tags
+  if (openStack.length > 0) {
+    openStack.forEach(tag => {
+      errors.push(`Unclosed tag: <${tag}>`);
+      suggestions.push(`Add closing tag </${tag}>`);
+      fixedCode = fixedCode + `</${tag}>`;
+    });
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    fixedCode: errors.length > 0 ? fixedCode : undefined,
+    suggestions
+  };
+}
+
+/**
+ * Check HTML attributes for validity
+ */
+static checkHTMLAttributes(html: string): ValidationResult {
+  const errors: string[] = [];
+  const suggestions: string[] = [];
+  let fixedCode = html;
+  
+  // Check for unquoted attribute values
+  const unquotedAttrRegex = /\s([a-zA-Z-]+)=([^"'\s>]+)/g;
+  let match;
+  
+  while ((match = unquotedAttrRegex.exec(html)) !== null) {
+    const attrName = match[1];
+    const attrValue = match[2];
+    
+    if (!/^[a-zA-Z0-9_-]+$/.test(attrValue)) {
+      errors.push(`Unquoted attribute value: ${attrName}=${attrValue}`);
+      suggestions.push(`Quote the attribute value: ${attrName}="${attrValue}"`);
+      fixedCode = fixedCode.replace(match[0], ` ${attrName}="${attrValue}"`);
+    }
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    fixedCode: errors.length > 0 ? fixedCode : undefined,
+    suggestions
+  };
+}
+
+/**
+ * Check CSS for missing semicolons
+ */
+static checkCSSSemicolons(css: string): ValidationResult {
+  const errors: string[] = [];
+  const suggestions: string[] = [];
+  let fixedCode = css;
+  
+  // Find CSS rules
+  const ruleRegex = /([^{]+)\{([^}]+)\}/g;
+  let match;
+  
+  while ((match = ruleRegex.exec(css)) !== null) {
+    const selector = match[1].trim();
+    const declarations = match[2].trim();
+    
+    // Check each declaration
+    const declarationLines = declarations.split('\n').map(line => line.trim()).filter(line => line);
+    
+    declarationLines.forEach((line, index) => {
+      if (line && !line.endsWith(';') && !line.endsWith('}')) {
+        errors.push(`Missing semicolon in CSS declaration: ${line}`);
+        suggestions.push(`Add semicolon: ${line};`);
+        fixedCode = fixedCode.replace(line, line + ';');
+      }
+    });
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    fixedCode: errors.length > 0 ? fixedCode : undefined,
+    suggestions
+  };
+}
+
+/**
+ * Check CSS properties for validity
+ */
+static checkCSSProperties(css: string): ValidationResult {
+  const errors: string[] = [];
+  const suggestions: string[] = [];
+  let fixedCode = css;
+  
+  // Check for invalid color values
+  const colorRegex = /(color|background-color|border-color)\s*:\s*([^;]+);/g;
+  let match;
+  
+  while ((match = colorRegex.exec(css)) !== null) {
+    const property = match[1];
+    const value = match[2].trim();
+    
+    // Check if it's a valid color format
+    if (!/^(#[0-9a-fA-F]{3,6}|rgb\(|rgba\(|hsl\(|hsla\(|[a-zA-Z]+)/.test(value)) {
+      errors.push(`Invalid color value: ${property}: ${value}`);
+      suggestions.push(`Use a valid color format like #000000, rgb(0,0,0), or color names`);
+    }
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    fixedCode: errors.length > 0 ? fixedCode : undefined,
+    suggestions
+  };
+}
+
+/**
+ * Check CSS bracket matching
+ */
+static checkCSSBrackets(css: string): ValidationResult {
+  const errors: string[] = [];
+  const suggestions: string[] = [];
+  
+  let braceCount = 0;
+  let inString = false;
+  let stringChar = '';
+  
+  for (let i = 0; i < css.length; i++) {
+    const char = css[i];
+    const prevChar = i > 0 ? css[i - 1] : '';
+    
+    if ((char === '"' || char === "'") && prevChar !== '\\') {
+      if (!inString) {
+        inString = true;
+        stringChar = char;
+      } else if (char === stringChar) {
+        inString = false;
+        stringChar = '';
+      }
+    }
+    
+    if (!inString) {
+      if (char === '{') {
+        braceCount++;
+      } else if (char === '}') {
+        braceCount--;
+        if (braceCount < 0) {
+          errors.push('Extra closing brace } found');
+          suggestions.push('Remove the extra closing brace or add an opening brace');
+          break;
+        }
+      }
+    }
+  }
+  
+  if (braceCount > 0) {
+    errors.push(`${braceCount} unclosed brace(s) { found`);
+    suggestions.push('Add the missing closing brace(s) }');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    suggestions
+  };
+}
 }
 
 export class JavaScriptValidator {
