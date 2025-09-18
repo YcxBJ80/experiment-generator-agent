@@ -28,7 +28,7 @@ function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('openai/gpt-5');
+  const [selectedModel, setSelectedModel] = useState('openai/gpt-5-mini');
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
