@@ -118,7 +118,7 @@ class ApiClient {
   ): Promise<void> {
     console.log('🚀 Starting streaming API call:', request);
     try {
-      const response = await fetch(`${API_BASE_URL}/experiments/generate-stream`, {
+      const response = await fetch(`${API_BASE_URL}/messages/generate-stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
