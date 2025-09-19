@@ -113,7 +113,7 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
     const { prompt, conversation_id, message_id, model }: GenerateExperimentRequest & { message_id?: string } = req.body;
     
     // Set default model if not provided
-    const selectedModel = model || 'moonshotai/kimi-k2';
+    const selectedModel = model || 'openai/gpt-5-mini';
 
     if (!prompt) {
       return res.status(400).json({

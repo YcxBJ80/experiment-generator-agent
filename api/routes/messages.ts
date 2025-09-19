@@ -109,7 +109,10 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
   console.log('🔥 Stream endpoint called!');
     console.log('Request body:', req.body);
   try {
-    const { prompt, conversation_id, message_id }: GenerateExperimentRequest & { message_id?: string } = req.body;
+    const { prompt, conversation_id, message_id, model }: GenerateExperimentRequest & { message_id?: string } = req.body;
+    
+    // Set default model if not provided
+    const selectedModel = model || 'openai/gpt-5-mini';
 
     if (!prompt) {
       return res.status(400).json({
@@ -241,11 +244,11 @@ Now produce the summary followed by a complete, standalone HTML document inside 
     if (openai) {
       try {
         console.log('🚀 Starting streaming OpenAI API call...');
-        console.log('Model:', 'moonshotai/kimi-k2');
+        console.log('Model:', selectedModel);
         console.log('Prompt length:', prompt.length);
         
         const stream = await openai.chat.completions.create({
-          model: 'moonshotai/kimi-k2',
+          model: selectedModel,
           messages: [
             {
               role: 'system',
@@ -362,7 +365,10 @@ Now produce the summary followed by a complete, standalone HTML document inside 
  */
 router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
-    const { prompt, conversation_id }: GenerateExperimentRequest = req.body;
+    const { prompt, conversation_id, model }: GenerateExperimentRequest = req.body;
+    
+    // Set default model if not provided
+    const selectedModel = model || 'openai/gpt-5-mini';
 
     if (!prompt) {
       return res.status(400).json({
@@ -489,11 +495,11 @@ Now produce the summary followed by a complete, standalone HTML document inside 
         while (attempts < maxAttempts && !experimentData) {
           attempts++;
           console.log(`🚀 Attempt ${attempts} to call OpenAI API...`);
-          console.log('Model:', 'moonshotai/kimi-k2');
+          console.log('Model:', selectedModel);
           console.log('Prompt length:', prompt.length);
           
           const response = await openai.chat.completions.create({
-          model: 'moonshotai/kimi-k2',
+          model: selectedModel,
             messages: [
               {
                 role: 'system',
@@ -622,7 +628,7 @@ Now produce the summary followed by a complete, standalone HTML document inside 
                     
                     console.log('Trying to have model fix syntax errors...');
                     const fixCompletion = await openai.chat.completions.create({
-                      model: 'moonshotai/kimi-k2',
+                      model: selectedModel,
                       messages: [
                         { role: 'system', content: '你是一个JavaScript代码修复专家。请修复提供的代码中的语法错误。' },
                         { role: 'user', content: fixPrompt }
