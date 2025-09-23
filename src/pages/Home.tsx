@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MessageSquare, Send, Play, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { apiClient, type ExperimentData, type Conversation as ApiConversation, type Message as ApiMessage } from '@/lib/api';
 import LightRays from '../components/LightRays';
+import DonationButton from '../components/DonationButton';
 
 interface Message {
   id: string;
@@ -689,6 +690,9 @@ function Home() {
           </div>
         </div>
       </div>
+      
+      {/* Donation Button - 只在主页显示 */}
+      <DonationButton />
     </div>
   );
 };
