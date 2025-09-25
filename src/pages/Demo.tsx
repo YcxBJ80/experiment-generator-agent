@@ -110,21 +110,23 @@ export default function Demo() {
 
   if (!experiment) {
     return (
-      <div className="h-screen relative" style={{ backgroundColor: '#2D3748' }}>
-        {/* Back button */}
-        <button
-          onClick={handleGoBack}
-          className="absolute top-4 left-4 z-10 flex items-center gap-2 px-4 py-2 bg-dark-bg-secondary hover:bg-dark-bg-tertiary border border-dark-border rounded-low text-dark-text transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </button>
+      <div className="h-screen flex flex-col" style={{ backgroundColor: '#2D3748' }}>
+        {/* Back button header */}
+        <div className="flex-shrink-0 p-4" style={{ backgroundColor: '#f7fafc' }}>
+          <button
+            onClick={handleGoBack}
+            className="flex items-center gap-2 px-4 py-2 bg-dark-bg-secondary hover:bg-dark-bg-tertiary border border-dark-border rounded-low text-dark-text transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+        </div>
 
         {/* Error message */}
-        <div className="h-full flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="text-gray-600 text-lg mb-4">Experiment not found or failed to load</div>
-        <div className="text-gray-500 text-sm">Please check if the experiment ID is correct, or try again later</div>
+            <div className="text-gray-500 text-sm">Please check if the experiment ID is correct, or try again later</div>
           </div>
         </div>
       </div>
@@ -132,23 +134,27 @@ export default function Demo() {
   }
 
   return (
-    <div className="h-screen relative" style={{ backgroundColor: '#2D3748' }}>
-      {/* Return button */}
-      <button
-        onClick={handleGoBack}
-        className="absolute top-4 left-4 z-10 flex items-center gap-2 px-4 py-2 bg-dark-bg-secondary hover:bg-dark-bg-tertiary border border-dark-border rounded-low text-dark-text transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back
-      </button>
+    <div className="h-screen flex flex-col" style={{ backgroundColor: '#2D3748' }}>
+      {/* Back button header */}
+      <div className="flex-shrink-0 p-4" style={{ backgroundColor: '#f7fafc' }}>
+        <button
+          onClick={handleGoBack}
+          className="flex items-center gap-2 px-4 py-2 bg-dark-bg-secondary hover:bg-dark-bg-tertiary border border-dark-border rounded-low text-dark-text transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+      </div>
 
       {/* Experiment display area */}
-      <iframe
-        id="experiment-iframe"
-        className="w-full h-full border-none"
-        title={experiment?.title || 'Experiment Demo'}
-        sandbox="allow-scripts allow-same-origin"
-      />
+      <div className="flex-1 min-h-0">
+        <iframe
+          id="experiment-iframe"
+          className="w-full h-full border-none"
+          title={experiment?.title || 'Experiment Demo'}
+          sandbox="allow-scripts allow-same-origin"
+        />
+      </div>
     </div>
   );
 }

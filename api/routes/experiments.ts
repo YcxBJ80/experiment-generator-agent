@@ -170,7 +170,6 @@ You follow this pipeline for every request:
      * Use flexbox or CSS Grid for proper layout structure
    - ANIMATION REQUIREMENTS (CRITICAL):
      * Include smooth, continuous animations that illustrate the core concepts
-     * Add particle systems where relevant (e.g., air molecules for Bernoulli's principle, electrons for circuits, atoms for chemical reactions)
      * The components that are crucial for the demo should be is different color than the background (normally dark colors)
      * Use CSS animations, transitions, and JavaScript-driven animations extensively
      * Create visual feedback for all user interactions (hover effects, click animations, parameter changes)
@@ -182,7 +181,7 @@ You follow this pipeline for every request:
    - SPECIFIC ANIMATION EXAMPLES TO IMPLEMENT:
      * For fluid dynamics: flowing particles, pressure visualization, streamlines
      * For mechanics: moving objects with trails, force vectors, energy transformations
-     * For electricity: flowing electrons, field visualizations, sparks and glows
+     * For electricity: flowing electrons, field visualizations, force vectors, sparks and glows
      * For chemistry: molecular movements, bond formations/breaking, reaction progress
      * For optics: light rays, wave propagations, interference patterns
      * For thermodynamics: particle motion speed changes, heat flow visualization
@@ -224,12 +223,11 @@ You follow this pipeline for every request:
    - Make sure the code is correct and free of syntax errors.
 
 General Rules:
-- Always aim for maximum visual impact and educational value through animations.
+- Always aim for visual impact and educational value through animations.
 - Prioritize smooth, realistic animations that enhance understanding.
 - Keep accessibility and clear visualization in mind.
 - Avoid unverified or unsafe algorithms/experiments.
 - Use neutral and factual tone in summaries.
-- If the request is vague, ask questions before starting.
 - If something is physically dangerous, simulate it safely instead of providing real-life unsafe instructions.
 
 User request: "${prompt}"
@@ -425,7 +423,6 @@ You follow this pipeline for every request:
      * Use flexbox or CSS Grid for proper layout structure
    - ANIMATION REQUIREMENTS (CRITICAL):
      * Include smooth, continuous animations that illustrate the core concepts
-     * Add particle systems where relevant (e.g., air molecules for Bernoulli's principle, electrons for circuits, atoms for chemical reactions)
      * The components that are crucial for the demo should be is different color than the background (normally dark colors)
      * Use CSS animations, transitions, and JavaScript-driven animations extensively
      * Create visual feedback for all user interactions (hover effects, click animations, parameter changes)
@@ -479,12 +476,11 @@ You follow this pipeline for every request:
    - Make sure the code is correct and free of syntax errors.
 
 General Rules:
-- Always aim for maximum visual impact and educational value through animations.
+- Always aim for visual impact and educational value through animations.
 - Prioritize smooth, realistic animations that enhance understanding.
 - Keep accessibility and clear visualization in mind.
 - Avoid unverified or unsafe algorithms/experiments.
 - Use neutral and factual tone in summaries.
-- If the request is vague, ask questions before starting.
 - If something is physically dangerous, simulate it safely instead of providing real-life unsafe instructions.
 
 User request: "${prompt}"
