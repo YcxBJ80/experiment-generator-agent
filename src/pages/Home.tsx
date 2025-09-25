@@ -207,17 +207,42 @@ function Home() {
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !currentConversation) return;
+    if (!inputMessage.trim()) return;
     
     const messageContent = inputMessage;
     setInputMessage('');
     setIsGenerating(true);
     setIsSearchingGenerating(true);
     
+    let newConversationId: string | null = null;
+    
     try {
+      // 每次发送消息时都创建新对话
+      const newConversationTitle = messageContent.length > 20 
+        ? messageContent.substring(0, 20) + '...' 
+        : messageContent;
+      
+      const newConversationResponse = await apiClient.createConversation(newConversationTitle);
+      
+      if (!newConversationResponse.success || !newConversationResponse.data) {
+        throw new Error('Failed to create new conversation');
+      }
+      
+      const newConversation: Conversation = {
+        id: newConversationResponse.data.id,
+        title: newConversationResponse.data.title,
+        messages: [],
+        lastUpdated: new Date(newConversationResponse.data.created_at)
+      };
+      
+      // 将新对话添加到对话列表并切换到新对话
+      setConversations(prev => [newConversation, ...prev]);
+      setCurrentConversation(newConversationResponse.data.id);
+      
+      newConversationId = newConversationResponse.data.id;
       // 保存用户消息到数据库
       const userMessageResponse = await apiClient.createMessage({
-        conversation_id: currentConversation,
+        conversation_id: newConversationId,
         content: messageContent,
         type: 'user'
       });
@@ -232,19 +257,9 @@ function Home() {
         
         // 更新本地状态
         setConversations(prev => prev.map(conv => {
-          if (conv.id === currentConversation) {
+          if (conv.id === newConversationId) {
             const updatedMessages = [...conv.messages, userMessage];
-            // If this is the first message of a new conversation, update the title
-            const title = conv.messages.length === 0 
-              ? messageContent.length > 20 ? messageContent.substring(0, 20) + '...' : messageContent
-              : conv.title;
-            
-            // 如果标题需要更新，调用API更新
-            if (conv.messages.length === 0) {
-              apiClient.updateConversationTitle(currentConversation, title);
-            }
-            
-            return { ...conv, messages: updatedMessages, title, lastUpdated: new Date() };
+            return { ...conv, messages: updatedMessages, lastUpdated: new Date() };
           }
           return conv;
         }));
@@ -252,7 +267,7 @@ function Home() {
       
       // 创建空的助手消息用于流式响应
       const assistantMessageResponse = await apiClient.createMessage({
-        conversation_id: currentConversation,
+        conversation_id: newConversationId,
         content: '',
         type: 'assistant'
       });
@@ -268,7 +283,7 @@ function Home() {
         
         // 添加空的助手消息到状态
         setConversations(prev => prev.map(conv => 
-          conv.id === currentConversation 
+          conv.id === newConversationId 
             ? { ...conv, messages: [...conv.messages, assistantMessage], lastUpdated: new Date() }
             : conv
         ));
@@ -282,7 +297,7 @@ function Home() {
          await apiClient.generateExperimentStream(
            {
              prompt: messageContent,
-             conversation_id: currentConversation,
+             conversation_id: newConversationId,
              message_id: assistantMessageResponse.data.id,
              model: selectedModel
            },
@@ -295,7 +310,7 @@ function Home() {
              
              // 实时更新消息内容
              setConversations(prev => prev.map(conv => 
-               conv.id === currentConversation 
+               conv.id === newConversationId 
                  ? {
                      ...conv,
                      messages: conv.messages.map(msg => 
@@ -317,13 +332,13 @@ function Home() {
                  const checkExperimentIdDuringStream = async (attempt = 1, maxAttempts = 5) => {
                    try {
                      console.log(`流式响应中检查experiment_id，第${attempt}次尝试`);
-                     const messagesResponse = await apiClient.getMessages(currentConversation);
+                     const messagesResponse = await apiClient.getMessages(newConversationId);
                      if (messagesResponse.success && messagesResponse.data) {
                        const updatedMessage = messagesResponse.data.find(msg => msg.id === assistantMessageResponse.data.id);
                        if (updatedMessage?.experiment_id) {
                          console.log('✅ 流式响应中获取到experiment_id:', updatedMessage.experiment_id);
                          setConversations(prev => prev.map(conv => 
-                           conv.id === currentConversation 
+                           conv.id === newConversationId 
                              ? {
                                  ...conv,
                                  messages: conv.messages.map(msg => 
@@ -358,7 +373,7 @@ function Home() {
          
          // 流式响应完成，更新状态
          setConversations(prev => prev.map(conv => 
-           conv.id === currentConversation 
+           conv.id === newConversationId 
              ? {
                  ...conv,
                  messages: conv.messages.map(msg => 
@@ -377,13 +392,13 @@ function Home() {
          const checkExperimentId = async (attempt = 1, maxAttempts = 10) => {
            try {
              console.log(`检查experiment_id，第${attempt}次尝试`);
-             const messagesResponse = await apiClient.getMessages(currentConversation);
+             const messagesResponse = await apiClient.getMessages(newConversationId);
              if (messagesResponse.success && messagesResponse.data) {
                const updatedMessage = messagesResponse.data.find(msg => msg.id === assistantMessageResponse.data.id);
                if (updatedMessage?.experiment_id) {
                  console.log('✅ 获取到experiment_id:', updatedMessage.experiment_id);
                  setConversations(prev => prev.map(conv => 
-                   conv.id === currentConversation 
+                   conv.id === newConversationId 
                      ? {
                          ...conv,
                          messages: conv.messages.map(msg => 
@@ -425,26 +440,28 @@ function Home() {
       console.error('生成实验失败:', error);
       const errorContent = `Sorry, an error occurred while generating the experiment: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again later.`;
       
-      // 保存错误消息到数据库
-      const errorMessageResponse = await apiClient.createMessage({
-        conversation_id: currentConversation,
-        content: errorContent,
-        type: 'assistant'
-      });
-      
-      if (errorMessageResponse.success && errorMessageResponse.data) {
-        const errorMessage: Message = {
-          id: errorMessageResponse.data.id,
-          content: errorMessageResponse.data.content,
-          type: 'assistant',
-          timestamp: new Date(errorMessageResponse.data.created_at)
-        };
+      // 保存错误消息到数据库（仅在成功创建对话后）
+      if (newConversationId) {
+        const errorMessageResponse = await apiClient.createMessage({
+          conversation_id: newConversationId,
+          content: errorContent,
+          type: 'assistant'
+        });
         
-        setConversations(prev => prev.map(conv => 
-          conv.id === currentConversation 
-            ? { ...conv, messages: [...conv.messages, errorMessage], lastUpdated: new Date() }
-            : conv
-        ));
+        if (errorMessageResponse.success && errorMessageResponse.data) {
+          const errorMessage: Message = {
+            id: errorMessageResponse.data.id,
+            content: errorMessageResponse.data.content,
+            type: 'assistant',
+            timestamp: new Date(errorMessageResponse.data.created_at)
+          };
+          
+          setConversations(prev => prev.map(conv => 
+            conv.id === newConversationId 
+              ? { ...conv, messages: [...conv.messages, errorMessage], lastUpdated: new Date() }
+              : conv
+          ));
+        }
       }
     } finally {
       setIsGenerating(false);
