@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { perplexityMCPClient } from '../lib/perplexityMcpClient.js';
-import { JavaScriptValidator, CodeLinter, LinterResult } from '../lib/jsValidator.js';
+
 import { DatabaseService } from '../lib/supabase.js';
 
 // Ensure environment variables are loaded
@@ -387,8 +387,6 @@ router.post('/generate', async (req: ExpressRequest, res: ExpressResponse) => {
     const perplexityKnowledge = await perplexityMCPClient.getExperimentKnowledge(prompt);
     console.log('Perplexity knowledge acquisition completed');
 
-    let attempts = 0;
-
     // Build new system prompt (require output summary + complete HTML document in `html` code block)
 const systemPrompt = `You are an AI agent specialized in creating highly interactive and visually stunning HTML-based experiment demos with rich animations and dynamic visualizations.
 
@@ -496,11 +494,7 @@ Now produce the summary followed by a complete, standalone HTML document inside 
     console.log('🔍 Checking openai client status:', !!openai);
     if (openai) {
         try {
-          const maxAttempts = 3;
-        
-        while (attempts < maxAttempts && !experimentData) {
-          attempts++;
-          console.log(`🚀 Attempt ${attempts} to call OpenAI API...`);
+          console.log('🚀 Calling OpenAI API...');
           console.log('Model:', 'moonshotai/kimi-k2');
           console.log('Prompt length:', prompt.length);
           
@@ -618,85 +612,17 @@ Now produce the summary followed by a complete, standalone HTML document inside 
                 }
               }
               
-              // 全面的代码验证和修复
-               const fullHtmlContent = combineCodeSections(rawData.html_content || '', rawData.css_content || '', rawData.js_content || '');
-               const { htmlContent, cssContent, jsContent } = extractCodeSections(fullHtmlContent);
-               
-               // 使用新的 CodeLinter 进行全面检查
-               const linterResult: LinterResult = CodeLinter.lintCode(htmlContent, cssContent, jsContent);
-               
-               if (!linterResult.overall.isValid) {
-                 console.log(`Code generated in attempt ${attempts} has ${linterResult.overall.totalErrors} errors`);
-                 console.log('HTML errors:', linterResult.html.errors);
-                 console.log('CSS errors:', linterResult.css.errors);
-                 console.log('JavaScript errors:', linterResult.js.errors);
-                 
-                 if (attempts < maxAttempts) {
-                   // 尝试使用模型修复所有错误
-                   try {
-                     const fixPrompt = generateComprehensiveFixPrompt(linterResult, fullHtmlContent);
-                     
-                     console.log('Attempting to have model fix all code errors...');
-                     const fixCompletion = await openai.chat.completions.create({
-                       model: selectedModel,
-                       messages: [
-                         {
-                           role: 'system',
-                           content: 'You are a code fixer that can fix HTML, CSS, and JavaScript errors. Return only the corrected complete HTML code with embedded CSS and JavaScript, without any explanations or markdown formatting.'
-                         },
-                         {
-                           role: 'user',
-                           content: fixPrompt
-                         }
-                       ],
-                       temperature: 0.1,
-                       max_tokens: 4000
-                     });
-                     
-                     const fixedResponse = fixCompletion.choices[0]?.message?.content;
-                     if (fixedResponse) {
-                       // 验证修复后的代码
-                       const { htmlContent: fixedHtml, cssContent: fixedCss, jsContent: fixedJs } = extractCodeSections(fixedResponse);
-                       const revalidationResult = CodeLinter.lintCode(fixedHtml, fixedCss, fixedJs);
-                       
-                       if (revalidationResult.overall.isValid || revalidationResult.overall.totalErrors < linterResult.overall.totalErrors) {
-                         // 更新修复后的代码
-                         rawData.html_content = fixedHtml;
-                         rawData.css_content = fixedCss;
-                         rawData.js_content = fixedJs;
-                         experimentData = rawData;
-                         console.log('Code fixed successfully by model');
-                       } else {
-                         console.log('Model fix did not improve code quality, using auto-fix');
-                         experimentData = applyAutoFixesToRawData(rawData, linterResult);
-                       }
-                     } else {
-                       experimentData = applyAutoFixesToRawData(rawData, linterResult);
-                     }
-                   } catch (fixError) {
-                     console.error('Error fixing code with model:', fixError);
-                     experimentData = applyAutoFixesToRawData(rawData, linterResult);
-                   }
-                 } else {
-                   // 最后一次尝试，使用自动修复
-                   experimentData = applyAutoFixesToRawData(rawData, linterResult);
-                   console.log('Using auto-fixed code as final result');
-                 }
-               } else {
-                 console.log('Code validation passed - no errors found');
-                 experimentData = rawData;
-               }
+              // 直接使用生成的代码，不进行linter验证
+              console.log('✅ Code generation completed');
+              experimentData = rawData;
               
               console.log('✅ JSON parsing successful');
             } catch (parseError) {
               console.warn('❌ JSON parsing failed:', parseError.message);
               console.warn('First 1000 characters of original response:', responseContent.substring(0, 1000));
-              if (attempts >= maxAttempts) {
-                experimentData = null;
-              }
+              experimentData = null;
             }
           }
-        }
       } catch (apiError) {
         console.error('🔍 Entering API error handling code block');
         console.error('❌ OpenAI API call failed:');
@@ -749,8 +675,7 @@ Now produce the summary followed by a complete, standalone HTML document inside 
 
     res.json({
       success: true,
-      data: response,
-      attempts: attempts || 1
+      data: response
     });
 
   } catch (error) {

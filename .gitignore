@@ -37,3 +37,6 @@ test_*.js
 *_report.md
 debug_*.js
 diagnose_*.js
+
+# Trae IDE files
+.trae
