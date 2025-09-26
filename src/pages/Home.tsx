@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, Send, Play, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { apiClient, type ExperimentData, type Conversation as ApiConversation, type Message as ApiMessage } from '@/lib/api';
 import LightRays from '../components/LightRays';
 import DonationButton from '../components/DonationButton';
+import SurveyModal from '../components/SurveyModal';
 
 interface Message {
   id: string;
@@ -23,6 +24,7 @@ interface Conversation {
 
 function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<string>('');
   const [inputMessage, setInputMessage] = useState('');
@@ -39,21 +41,33 @@ function Home() {
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   // 搜索生成状态
   const [isSearchingGenerating, setIsSearchingGenerating] = useState(false);
+  // 问卷相关状态
+  const [showSurveyModal, setShowSurveyModal] = useState(false);
+  const [surveyExperimentId, setSurveyExperimentId] = useState<string>('');
 
   // 可选择的模型列表
   const availableModels = [
-    { id: 'anthropic/claude-sonnet-4', name: 'Claude 4 Sonnet' },
     { id: 'moonshotai/kimi-k2', name: 'Kimi K2' },
     { id: 'qwen/qwen3-coder', name: 'Qwen3 Coder' },
     { id: 'openai/gpt-5', name: 'GPT-5' },
     { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini' },
-    { id: 'google/gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
   ];
 
   // 加载对话历史
   useEffect(() => {
     loadConversations();
   }, []);
+
+  // 处理从Demo页面传递过来的问卷触发状态
+  useEffect(() => {
+    const state = location.state as { showSurvey?: boolean; experimentId?: string } | null;
+    if (state?.showSurvey && state?.experimentId) {
+      setShowSurveyModal(true);
+      setSurveyExperimentId(state.experimentId);
+      // 清除location state以防止重复触发
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state, navigate, location.pathname]);
 
   // 滚动监听
   useEffect(() => {
@@ -710,6 +724,16 @@ function Home() {
       
       {/* Donation Button - 只在主页显示 */}
       <DonationButton />
+      
+      {/* Survey Modal */}
+      {showSurveyModal && (
+        <SurveyModal
+          isOpen={showSurveyModal}
+          experimentId={surveyExperimentId}
+          onSubmit={() => setShowSurveyModal(false)}
+          onClose={() => setShowSurveyModal(false)}
+        />
+      )}
     </div>
   );
 };

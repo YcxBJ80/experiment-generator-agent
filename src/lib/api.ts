@@ -48,6 +48,24 @@ export interface Message {
   created_at: string;
 }
 
+export interface Survey {
+  id: string;
+  experiment_id: string;
+  reflects_real_world: boolean;
+  visualization_rating: number;
+  concept_understanding: number;
+  suggestions: string;
+  created_at: string;
+}
+
+export interface SurveySubmitRequest {
+  experiment_id: string;
+  reflects_real_world: boolean;
+  visualization_rating: number;
+  concept_understanding: number;
+  suggestions: string;
+}
+
 class ApiClient {
   private async request<T>(
     endpoint: string,
@@ -242,6 +260,16 @@ class ApiClient {
     return this.request<Message>('/messages', {
       method: 'POST',
       body: JSON.stringify(message),
+    });
+  }
+
+  /**
+   * Submit survey for experiment
+   */
+  async submitSurvey(surveyData: SurveySubmitRequest): Promise<ApiResponse<{ survey_id: string; message: string }>> {
+    return this.request<{ survey_id: string; message: string }>('/experiments/survey', {
+      method: 'POST',
+      body: JSON.stringify(surveyData),
     });
   }
 }

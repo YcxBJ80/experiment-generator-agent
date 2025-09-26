@@ -40,6 +40,16 @@ export interface Message {
   created_at: string;
 }
 
+export interface Survey {
+  id: string;
+  experiment_id: string;
+  reflects_real_world: boolean;
+  visualization_rating: number;
+  concept_understanding: number;
+  suggestions: string;
+  created_at: string;
+}
+
 // Helper functions for database operations
 export class DatabaseService {
   static async getConversations(): Promise<Conversation[]> {
@@ -272,6 +282,31 @@ export class DatabaseService {
         title: 'Experiment Demo', // Can extract title from content
         html_content: experiment.html_content
       };
+    } catch (error) {
+      console.error('Database error:', error);
+      return null;
+    }
+  }
+
+  static async createSurvey(surveyData: Omit<Survey, 'id' | 'created_at'>): Promise<Survey | null> {
+    if (!supabase) {
+      console.warn('Supabase not configured');
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('surveys')
+        .insert([surveyData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating survey:', error);
+        return null;
+      }
+
+      return data;
     } catch (error) {
       console.error('Database error:', error);
       return null;

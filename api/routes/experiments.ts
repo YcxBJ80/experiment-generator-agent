@@ -393,4 +393,61 @@ router.get('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
 
 
 
+/**
+ * Submit survey for experiment
+ */
+router.post('/survey', async (req: ExpressRequest, res: ExpressResponse) => {
+  try {
+    const { experiment_id, reflects_real_world, visualization_rating, concept_understanding, suggestions } = req.body;
+    
+    console.log(`📝 Submitting survey for experiment: ${experiment_id}`);
+    
+    // Validate required fields
+    if (!experiment_id || typeof reflects_real_world !== 'boolean' || 
+        !visualization_rating || !concept_understanding) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required survey fields'
+      });
+    }
+    
+    // Validate rating ranges
+    if (visualization_rating < 1 || visualization_rating > 10 || 
+        concept_understanding < 1 || concept_understanding > 10) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ratings must be between 1 and 10'
+      });
+    }
+    
+    // Save survey to database
+    const surveyData = {
+      experiment_id,
+      reflects_real_world,
+      visualization_rating: parseInt(visualization_rating),
+      concept_understanding: parseInt(concept_understanding),
+      suggestions: suggestions || ''
+    };
+    
+    const survey = await DatabaseService.createSurvey(surveyData);
+    
+    console.log(`✅ Survey submitted successfully, ID: ${survey.id}`);
+    
+    res.json({
+      success: true,
+      data: {
+        survey_id: survey.id,
+        message: 'Survey submitted successfully'
+      }
+    });
+    
+  } catch (error) {
+    console.error('Failed to submit survey:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to submit survey'
+    });
+  }
+});
+
 export default router;
