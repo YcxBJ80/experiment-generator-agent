@@ -26,6 +26,7 @@ export interface Conversation {
   title: string;
   created_at: string;
   updated_at: string;
+  messages?: Message[];
 }
 
 export interface Message {
@@ -37,7 +38,10 @@ export interface Message {
   html_content?: string;
   css_content?: string;
   js_content?: string;
+  title?: string;
+  is_conversation_root?: boolean;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Survey {
@@ -59,10 +63,11 @@ export class DatabaseService {
     }
 
     try {
-      console.log('Attempting to fetch conversations from Supabase...');
+      console.log('Attempting to fetch conversations from messages table...');
       const { data, error } = await supabase
-        .from('conversations')
+        .from('messages')
         .select('*')
+        .eq('is_conversation_root', true)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -75,8 +80,15 @@ export class DatabaseService {
         return [];
       }
 
-      console.log(`Successfully fetched ${data?.length || 0} conversations`);
-      return data || [];
+      const conversations: Conversation[] = (data || []).map(msg => ({
+        id: msg.conversation_id,
+        title: msg.title || 'New Conversation',
+        created_at: msg.created_at,
+        updated_at: msg.updated_at || msg.created_at
+      }));
+
+      console.log(`Successfully fetched ${conversations.length} conversations`);
+      return conversations;
     } catch (error) {
       console.error('Error fetching conversations:', {
         message: error instanceof Error ? error.message : 'Unknown error',
@@ -90,14 +102,23 @@ export class DatabaseService {
 
   static async createConversation(title: string = 'New Conversation'): Promise<Conversation | null> {
     if (!supabase) {
-      console.warn('Supabase not configured');
+      console.warn('Supabase not configured, returning null');
       return null;
     }
 
     try {
+      console.log('Creating new conversation with title:', title);
+      const conversationId = crypto.randomUUID();
+      
       const { data, error } = await supabase
-        .from('conversations')
-        .insert([{ title }])
+        .from('messages')
+        .insert([{ 
+          conversation_id: conversationId,
+          content: '',
+          type: 'assistant',
+          title,
+          is_conversation_root: true
+        }])
         .select()
         .single();
 
@@ -106,9 +127,17 @@ export class DatabaseService {
         return null;
       }
 
-      return data;
+      const conversation: Conversation = {
+        id: conversationId,
+        title,
+        created_at: data.created_at,
+        updated_at: data.updated_at || data.created_at
+      };
+
+      console.log('Successfully created conversation:', conversation);
+      return conversation;
     } catch (error) {
-      console.error('Database error:', error);
+      console.error('Error creating conversation:', error);
       return null;
     }
   }
@@ -121,9 +150,10 @@ export class DatabaseService {
 
     try {
       const { error } = await supabase
-        .from('conversations')
-        .update({ title, updated_at: new Date().toISOString() })
-        .eq('id', id);
+        .from('messages')
+        .update({ title })
+        .eq('conversation_id', id)
+        .eq('is_conversation_root', true);
 
       if (error) {
         console.error('Error updating conversation title:', error);
@@ -176,16 +206,23 @@ export class DatabaseService {
     }
   }
 
-  static async createMessage(message: Omit<Message, 'id' | 'created_at'>): Promise<Message | null> {
+  static async createMessage(message: Omit<Message, 'id' | 'created_at' | 'updated_at'>): Promise<Message | null> {
     if (!supabase) {
       console.warn('Supabase not configured');
       return null;
     }
 
     try {
+      // Ensure conversation_id is set, use experiment_id as fallback
+      const messageData = {
+        ...message,
+        conversation_id: message.conversation_id || message.experiment_id || crypto.randomUUID(),
+        is_conversation_root: message.is_conversation_root || false
+      };
+
       const { data, error } = await supabase
         .from('messages')
-        .insert([message])
+        .insert([messageData])
         .select()
         .single();
 
@@ -234,13 +271,14 @@ export class DatabaseService {
     }
 
     try {
+      // Delete all messages in the conversation (including the root message)
       const { error } = await supabase
-        .from('conversations')
+        .from('messages')
         .delete()
-        .eq('id', id);
+        .eq('conversation_id', id);
 
       if (error) {
-        console.error('Error deleting conversation:', error);
+        console.error('Error deleting conversation messages:', error);
         return false;
       }
 

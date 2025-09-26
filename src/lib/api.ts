@@ -214,14 +214,14 @@ class ApiClient {
    * Get all conversations
    */
   async getConversations(): Promise<ApiResponse<Conversation[]>> {
-    return this.request<Conversation[]>('/conversations');
+    return this.request<Conversation[]>('/messages/conversations');
   }
 
   /**
    * Create new conversation
    */
   async createConversation(title?: string): Promise<ApiResponse<Conversation>> {
-    return this.request<Conversation>('/conversations', {
+    return this.request<Conversation>('/messages/conversations', {
       method: 'POST',
       body: JSON.stringify({ title: title || 'New Conversation' }),
     });
@@ -231,7 +231,7 @@ class ApiClient {
    * Update conversation title
    */
   async updateConversationTitle(id: string, title: string): Promise<ApiResponse<{ success: boolean }>> {
-    return this.request<{ success: boolean }>(`/conversations/${id}`, {
+    return this.request<{ success: boolean }>(`/messages/conversations/${id}/title`, {
       method: 'PUT',
       body: JSON.stringify({ title }),
     });
@@ -241,7 +241,7 @@ class ApiClient {
    * Delete conversation
    */
   async deleteConversation(id: string): Promise<ApiResponse<{ success: boolean }>> {
-    return this.request<{ success: boolean }>(`/conversations/${id}`, {
+    return this.request<{ success: boolean }>(`/messages/conversations/${id}`, {
       method: 'DELETE',
     });
   }
@@ -250,7 +250,7 @@ class ApiClient {
    * Get messages of conversation
    */
   async getMessages(conversationId: string): Promise<ApiResponse<Message[]>> {
-    return this.request<Message[]>(`/conversations/${conversationId}/messages`);
+    return this.request<Message[]>(`/messages/conversations/${conversationId}/messages`);
   }
 
   /**
@@ -273,5 +273,97 @@ class ApiClient {
     });
   }
 }
+
+// Conversations API (now handled by messages API)
+export const conversationsApi = {
+  getAll: async (): Promise<Conversation[]> => {
+    const response = await fetch('/api/messages/conversations');
+    if (!response.ok) {
+      throw new Error('Failed to fetch conversations');
+    }
+    return response.json();
+  },
+
+  create: async (title: string): Promise<Conversation> => {
+    const response = await fetch('/api/messages/conversations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ title }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to create conversation');
+    }
+    return response.json();
+  },
+
+  updateTitle: async (id: string, title: string): Promise<void> => {
+    const response = await fetch(`/api/messages/conversations/${id}/title`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ title }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update conversation title');
+    }
+  },
+
+  delete: async (id: string): Promise<void> => {
+    const response = await fetch(`/api/messages/conversations/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete conversation');
+    }
+  },
+};
+
+// Messages API
+export const messagesApi = {
+  getByConversation: async (conversationId: string): Promise<Message[]> => {
+    const response = await fetch(`/api/messages/conversations/${conversationId}/messages`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch messages');
+    }
+    return response.json();
+  },
+
+  create: async (conversationId: string, message: Omit<Message, 'id' | 'created_at'>): Promise<Message> => {
+    const response = await fetch(`/api/messages/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(message),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to create message');
+    }
+    return response.json();
+  },
+
+  sendMessage: async (conversationId: string, content: string, experimentId?: string): Promise<ReadableStream> => {
+    const response = await fetch('/api/messages/generate-stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: content,
+        conversationId,
+        experimentId
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to send message');
+    }
+
+    return response.body!;
+  },
+};
 
 export const apiClient = new ApiClient();

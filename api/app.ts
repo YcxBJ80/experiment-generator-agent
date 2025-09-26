@@ -9,7 +9,6 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.js';
 import experimentsRoutes from './routes/experiments.js';
-import conversationsRoutes from './routes/conversations.js';
 import messagesRoutes from './routes/messages.js';
 
 // for esm mode
@@ -48,7 +47,6 @@ app.get('/', (req: ExpressRequest, res: ExpressResponse) => {
  */
 app.use('/api/auth', authRoutes);
 app.use('/api/experiments', experimentsRoutes);
-app.use('/api/conversations', conversationsRoutes);
 app.use('/api/messages', messagesRoutes);
 
 app.get('/api/health', (req: ExpressRequest, res: ExpressResponse) => {

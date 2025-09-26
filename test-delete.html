@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试删除确认对话框</title>
+</head>
+<body>
+    <h1>测试删除确认对话框</h1>
+    <button onclick="testDelete()">测试删除功能</button>
+    <div id="result"></div>
+
+    <script>
+        function testDelete() {
+            console.log('🗑️ 删除按钮被点击');
+            
+            const userConfirmed = confirm('Are you sure you want to delete this conversation? This action cannot be undone.');
+            console.log('👤 用户确认结果:', userConfirmed);
+            
+            const resultDiv = document.getElementById('result');
+            if (userConfirmed) {
+                console.log('✅ 用户确认删除');
+                resultDiv.innerHTML = '<p style="color: green;">用户确认删除</p>';
+            } else {
+                console.log('❌ 用户取消删除');
+                resultDiv.innerHTML = '<p style="color: red;">用户取消删除</p>';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试确认对话框</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: white;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .log {
+            background-color: #2a2a2a;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>测试确认对话框功能</h1>
+    
+    <button onclick="testBasicConfirm()">测试基本confirm</button>
+    <button onclick="testDeleteConfirm()">测试删除确认</button>
+    <button onclick="testWithEvent()">测试带事件的确认</button>
+    <button onclick="clearLog()">清空日志</button>
+    
+    <div id="log" class="log"></div>
+    
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function testBasicConfirm() {
+            log('🔔 测试基本confirm功能...');
+            const result = confirm('这是一个基本的确认对话框，请选择确定或取消。');
+            log(`✅ 用户选择: ${result ? '确定' : '取消'}`);
+        }
+        
+        function testDeleteConfirm() {
+            log('🗑️ 测试删除确认对话框...');
+            const result = confirm('Are you sure you want to delete this conversation? This action cannot be undone.');
+            log(`✅ 删除确认结果: ${result ? '确认删除' : '取消删除'}`);
+            
+            if (result) {
+                log('🚀 执行删除操作...');
+                // 模拟删除操作
+                setTimeout(() => {
+                    log('✅ 删除操作完成');
+                }, 500);
+            } else {
+                log('❌ 删除操作已取消');
+            }
+        }
+        
+        function testWithEvent() {
+            log('🎯 测试带事件处理的确认...');
+            
+            // 模拟事件对象
+            const mockEvent = {
+                stopPropagation: function() {
+                    log('🛑 事件传播已停止');
+                }
+            };
+            
+            // 模拟handleDeleteConversation的逻辑
+            mockEvent.stopPropagation();
+            
+            const conversationId = 'test-conversation-123';
+            log(`🗑️ 删除按钮被点击，对话ID: ${conversationId}`);
+            
+            const userConfirmed = confirm('Are you sure you want to delete this conversation? This action cannot be undone.');
+            log(`👤 用户确认结果: ${userConfirmed}`);
+            
+            if (!userConfirmed) {
+                log('❌ 用户取消删除');
+                return;
+            }
+            
+            log('✅ 用户确认删除，开始执行删除操作...');
+            
+            // 模拟API调用
+            setTimeout(() => {
+                log('🌐 API删除请求成功');
+                log('🔄 更新本地状态...');
+                log('✅ 删除流程完成');
+            }, 1000);
+        }
+        
+        // 页面加载时的初始化
+        window.onload = function() {
+            log('📄 页面已加载，confirm测试准备就绪');
+            log('💡 点击上方按钮测试不同的confirm场景');
+        };
+        
+        // 监控所有confirm调用
+        const originalConfirm = window.confirm;
+        window.confirm = function(message) {
+            log(`🔔 confirm函数被调用: "${message}"`);
+            const result = originalConfirm.call(this, message);
+            log(`📝 confirm返回值: ${result}`);
+            return result;
+        };
+    </script>
+</body>
+</html>

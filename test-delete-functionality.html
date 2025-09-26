@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>删除功能测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .button:hover {
+            background: #c82333;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <h1>删除功能测试页面</h1>
+    
+    <div class="test-section">
+        <h2>测试1: 基本确认对话框</h2>
+        <p>点击下面的按钮测试confirm对话框是否正常工作：</p>
+        <button class="button" onclick="testBasicConfirm()">测试基本确认对话框</button>
+        <div id="basic-result" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试2: 模拟删除会话功能</h2>
+        <p>模拟实际的删除会话流程：</p>
+        <button class="button" onclick="testDeleteConversation()">模拟删除会话</button>
+        <div id="delete-result" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试3: 检查浏览器兼容性</h2>
+        <p>检查当前浏览器对confirm的支持：</p>
+        <button class="button" onclick="checkBrowserSupport()">检查浏览器支持</button>
+        <div id="browser-result" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试4: 事件传播测试</h2>
+        <p>测试事件传播是否影响确认对话框：</p>
+        <div onclick="parentClick()" style="padding: 20px; background: #e9ecef; cursor: pointer;">
+            父元素 (点击会触发)
+            <button class="button" onclick="testEventPropagation(event)">子按钮 (应该阻止传播)</button>
+        </div>
+        <div id="event-result" class="log"></div>
+    </div>
+
+    <script>
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            element.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+        }
+
+        function testBasicConfirm() {
+            const resultDiv = document.getElementById('basic-result');
+            resultDiv.innerHTML = '';
+            
+            log('basic-result', '开始测试基本确认对话框...');
+            
+            try {
+                const result = confirm('这是一个测试确认对话框。点击确定或取消。');
+                log('basic-result', `用户选择: ${result ? '确定' : '取消'}`, result ? 'success' : 'error');
+            } catch (error) {
+                log('basic-result', `错误: ${error.message}`, 'error');
+            }
+        }
+
+        function testDeleteConversation() {
+            const resultDiv = document.getElementById('delete-result');
+            resultDiv.innerHTML = '';
+            
+            log('delete-result', '🗑️ 模拟删除按钮被点击...');
+            
+            try {
+                const userConfirmed = confirm('Are you sure you want to delete this conversation? This action cannot be undone.');
+                log('delete-result', `👤 用户确认结果: ${userConfirmed}`, userConfirmed ? 'success' : 'error');
+                
+                if (!userConfirmed) {
+                    log('delete-result', '❌ 用户取消删除');
+                    return;
+                }
+                
+                log('delete-result', '✅ 用户确认删除，开始执行删除操作...', 'success');
+                log('delete-result', '模拟API调用成功', 'success');
+                log('delete-result', '删除功能测试完成', 'success');
+                
+            } catch (error) {
+                log('delete-result', `错误: ${error.message}`, 'error');
+            }
+        }
+
+        function checkBrowserSupport() {
+            const resultDiv = document.getElementById('browser-result');
+            resultDiv.innerHTML = '';
+            
+            log('browser-result', '检查浏览器支持...');
+            
+            // 检查confirm函数
+            if (typeof window.confirm === 'function') {
+                log('browser-result', '✅ window.confirm 函数存在', 'success');
+            } else {
+                log('browser-result', '❌ window.confirm 函数不存在', 'error');
+            }
+            
+            // 检查浏览器信息
+            log('browser-result', `浏览器: ${navigator.userAgent}`);
+            log('browser-result', `平台: ${navigator.platform}`);
+            
+            // 测试confirm是否被重写
+            const originalConfirm = window.confirm;
+            log('browser-result', `confirm函数类型: ${typeof originalConfirm}`);
+            log('browser-result', `confirm函数字符串: ${originalConfirm.toString().substring(0, 100)}...`);
+        }
+
+        function parentClick() {
+            log('event-result', '父元素被点击');
+        }
+
+        function testEventPropagation(event) {
+            const resultDiv = document.getElementById('event-result');
+            if (resultDiv.innerHTML === '') {
+                log('event-result', '测试事件传播...');
+            }
+            
+            log('event-result', '子按钮被点击');
+            
+            // 阻止事件传播
+            event.stopPropagation();
+            log('event-result', '调用了 event.stopPropagation()');
+            
+            // 测试确认对话框
+            const result = confirm('测试事件传播中的确认对话框');
+            log('event-result', `确认结果: ${result}`, result ? 'success' : 'error');
+        }
+    </script>
+</body>
+</html>

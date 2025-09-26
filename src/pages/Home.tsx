@@ -12,6 +12,12 @@ interface Message {
   type: 'user' | 'assistant';
   timestamp: Date;
   experiment_id?: string;
+  conversation_id?: string;
+  title?: string;
+  is_conversation_root?: boolean;
+  html_content?: string;
+  css_content?: string;
+  js_content?: string;
   isTyping?: boolean;
 }
 
@@ -20,6 +26,8 @@ interface Conversation {
   title: string;
   messages: Message[];
   lastUpdated: Date;
+  created_at?: string;
+  updated_at?: string;
 }
 
 function Home() {
@@ -184,39 +192,102 @@ function Home() {
   const handleDeleteConversation = async (conversationId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // 防止触发对话选择
     
-    console.log('🗑️ 删除按钮被点击，对话ID:', conversationId);
+    // 强制输出到控制台，确保日志可见
+    console.warn('🗑️ [DELETE DEBUG] 删除按钮被点击，对话ID:', conversationId);
+    console.warn('📊 [DELETE DEBUG] 删除前对话列表长度:', conversations.length);
+    console.warn('📋 [DELETE DEBUG] 当前对话列表:', conversations.map(c => ({ id: c.id, title: c.title })));
     
-    const userConfirmed = confirm('Are you sure you want to delete this conversation? This action cannot be undone.');
-    console.log('👤 用户确认结果:', userConfirmed);
+    // 使用更可靠的确认机制，处理Electron环境中confirm的异常行为
+    let userConfirmed: boolean;
+    try {
+      console.warn('🔍 [DELETE DEBUG] 准备显示确认对话框...');
+      const confirmResult = window.confirm('确定要删除这个对话吗？此操作无法撤销。');
+      console.warn('👤 [DELETE DEBUG] 原始确认结果 (类型:', typeof confirmResult, ', 值:', confirmResult, ')');
+      
+      // 处理Electron环境中confirm可能返回对象的情况
+      if (typeof confirmResult === 'boolean') {
+        userConfirmed = confirmResult;
+      } else if (typeof confirmResult === 'object' && confirmResult !== null) {
+        // 在某些Electron环境中，confirm可能返回包含结果的对象
+        userConfirmed = Boolean((confirmResult as any).result || (confirmResult as any).value || confirmResult);
+      } else {
+        // 其他情况转换为boolean
+        userConfirmed = Boolean(confirmResult);
+      }
+      
+      console.warn('👤 [DELETE DEBUG] 处理后的确认结果:', userConfirmed);
+    } catch (error) {
+      console.error('❌ [DELETE DEBUG] 确认对话框出错:', error);
+      userConfirmed = false;
+    }
     
+    // 严格检查确认结果
     if (!userConfirmed) {
-      console.log('❌ 用户取消删除');
+      console.warn('❌ [DELETE DEBUG] 用户取消删除，停止删除操作');
+      console.warn('📊 [DELETE DEBUG] 取消删除后对话列表长度:', conversations.length);
       return;
     }
     
-    console.log('✅ 用户确认删除，开始执行删除操作...');
+    console.warn('✅ [DELETE DEBUG] 用户确认删除，开始执行删除操作...');
     
     try {
+      console.warn('🌐 [DELETE DEBUG] 发送删除请求到服务器...');
+      console.warn('🔗 [DELETE DEBUG] 请求URL: /api/messages/conversations/' + conversationId);
+      
       const response = await apiClient.deleteConversation(conversationId);
+      console.warn('📡 [DELETE DEBUG] 服务器响应:', JSON.stringify(response, null, 2));
       
       if (response.success) {
+        console.warn('✅ [DELETE DEBUG] 服务器确认删除成功，更新前端状态...');
+        
+        // 计算删除后的剩余对话
+        const remainingConversations = conversations.filter(conv => conv.id !== conversationId);
+        console.warn('📊 [DELETE DEBUG] 删除后剩余对话数量:', remainingConversations.length);
+        console.warn('📋 [DELETE DEBUG] 剩余对话列表:', remainingConversations.map(c => ({ id: c.id, title: c.title })));
+        
         // 更新本地状态
-        setConversations(prev => prev.filter(conv => conv.id !== conversationId));
+        console.warn('🔄 [DELETE DEBUG] 更新本地状态...');
+        setConversations(remainingConversations);
         
         // If the deleted conversation is the current one, switch to another conversation or create a new one
         if (currentConversation === conversationId) {
-          const remainingConversations = conversations.filter(conv => conv.id !== conversationId);
+          console.warn('🔄 [DELETE DEBUG] 删除的是当前对话，需要切换...');
           if (remainingConversations.length > 0) {
+            console.warn('➡️ [DELETE DEBUG] 切换到第一个剩余对话:', remainingConversations[0].id);
             setCurrentConversation(remainingConversations[0].id);
           } else {
-            // If there are no other conversations, create a new one
+            console.warn('🆕 [DELETE DEBUG] 没有剩余对话，创建新对话...');
+            setCurrentConversation('');
             handleNewChat();
           }
         }
+        
+        console.warn('🎉 [DELETE DEBUG] 删除操作完成');
+        
+        // 强制重新加载对话列表以确保同步
+        console.warn('🔄 [DELETE DEBUG] 重新加载对话列表以确保同步...');
+        try {
+          const conversationsResponse = await apiClient.getConversations();
+          if (conversationsResponse.success && conversationsResponse.data) {
+            console.warn('📋 [DELETE DEBUG] 从服务器重新加载的对话列表:', conversationsResponse.data.length);
+            setConversations(conversationsResponse.data.map(conv => ({
+              id: conv.id,
+              title: conv.title,
+              messages: [],
+              lastUpdated: new Date(conv.updated_at)
+            })));
+          }
+        } catch (reloadError) {
+          console.error('❌ [DELETE DEBUG] 重新加载对话列表失败:', reloadError);
+        }
+        
+      } else {
+        console.error('❌ [DELETE DEBUG] 服务器删除失败:', response);
+        alert('删除对话失败，请稍后重试。');
       }
     } catch (error) {
-      console.error('删除对话失败:', error);
-      alert('Failed to delete conversation. Please try again later.');
+      console.error('❌ [DELETE DEBUG] 删除对话失败:', error);
+      alert('删除对话失败，请稍后重试。');
     }
   };
 

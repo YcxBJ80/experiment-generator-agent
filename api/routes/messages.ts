@@ -16,6 +16,100 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const router = express.Router();
 
+// Conversations endpoints (integrated into messages)
+router.get('/conversations', async (req, res) => {
+  try {
+    const conversations = await DatabaseService.getConversations();
+    res.json(conversations);
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    res.status(500).json({ error: 'Failed to fetch conversations' });
+  }
+});
+
+router.post('/conversations', async (req, res) => {
+  try {
+    const { title } = req.body;
+    const conversation = await DatabaseService.createConversation(title || 'New Conversation');
+    
+    if (!conversation) {
+      return res.status(500).json({ error: 'Failed to create conversation' });
+    }
+    
+    res.json(conversation);
+  } catch (error) {
+    console.error('Error creating conversation:', error);
+    res.status(500).json({ error: 'Failed to create conversation' });
+  }
+});
+
+router.put('/conversations/:id/title', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+    
+    const success = await DatabaseService.updateConversationTitle(id, title);
+    
+    if (!success) {
+      return res.status(500).json({ error: 'Failed to update conversation title' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating conversation title:', error);
+    res.status(500).json({ error: 'Failed to update conversation title' });
+  }
+});
+
+router.delete('/conversations/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const success = await DatabaseService.deleteConversation(id);
+    
+    if (!success) {
+      return res.status(500).json({ error: 'Failed to delete conversation' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting conversation:', error);
+    res.status(500).json({ error: 'Failed to delete conversation' });
+  }
+});
+
+// Messages endpoints
+router.get('/conversations/:conversationId/messages', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const messages = await DatabaseService.getMessages(conversationId);
+    res.json(messages);
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+router.post('/conversations/:conversationId/messages', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const messageData = {
+      ...req.body,
+      conversation_id: conversationId
+    };
+    
+    const message = await DatabaseService.createMessage(messageData);
+    
+    if (!message) {
+      return res.status(500).json({ error: 'Failed to create message' });
+    }
+    
+    res.json(message);
+  } catch (error) {
+    console.error('Error creating message:', error);
+    res.status(500).json({ error: 'Failed to create message' });
+  }
+});
+
 /**
  * Validate and clean JavaScript code, prevent HTML tags from mixing in
  */

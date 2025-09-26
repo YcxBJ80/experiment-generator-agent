@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试删除功能修复</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .danger-button {
+            background: #dc3545;
+        }
+        .danger-button:hover {
+            background: #c82333;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .instructions {
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 删除功能修复测试</h1>
+    
+    <div class="instructions">
+        <h3>📋 测试说明</h3>
+        <p>这个页面用于测试修复后的删除功能。请按照以下步骤进行测试：</p>
+        <ol>
+            <li>首先在应用中创建一些测试对话</li>
+            <li>点击下面的按钮打开应用页面</li>
+            <li>在浏览器控制台中运行测试脚本</li>
+            <li>测试删除功能的确认和取消操作</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h3>🚀 快速操作</h3>
+        <button class="test-button" onclick="openApp()">打开应用页面</button>
+        <button class="test-button" onclick="copyTestScript()">复制测试脚本</button>
+        <button class="test-button" onclick="checkAPI()">检查API状态</button>
+    </div>
+
+    <div class="test-section">
+        <h3>🧪 测试脚本</h3>
+        <p>将以下脚本复制到应用页面的浏览器控制台中运行：</p>
+        <div class="log" id="testScript">
+// 删除功能测试脚本
+console.log('🧪 开始删除功能测试...');
+
+// 1. 检查页面状态
+function checkPageStatus() {
+    console.log('📊 页面状态检查:');
+    console.log('- 当前URL:', window.location.href);
+    console.log('- 页面标题:', document.title);
+    
+    // 查找对话列表
+    const conversations = document.querySelectorAll('[class*="cursor-pointer"]');
+    console.log('- 找到对话数量:', conversations.length);
+    
+    // 查找删除按钮
+    const deleteButtons = document.querySelectorAll('button[title="Delete Conversation"]');
+    console.log('- 找到删除按钮数量:', deleteButtons.length);
+    
+    return { conversations, deleteButtons };
+}
+
+// 2. 监控confirm函数
+function monitorConfirm() {
+    console.log('🔍 开始监控confirm函数...');
+    
+    const originalConfirm = window.confirm;
+    let confirmCallCount = 0;
+    
+    window.confirm = function(message) {
+        confirmCallCount++;
+        console.log(`📞 confirm被调用 (第${confirmCallCount}次):`);
+        console.log('- 消息:', message);
+        console.log('- 调用栈:', new Error().stack);
+        
+        // 让用户选择
+        const result = originalConfirm.call(this, message);
+        console.log('- 用户选择结果:', result, '(类型:', typeof result, ')');
+        
+        return result;
+    };
+    
+    return () => {
+        window.confirm = originalConfirm;
+        console.log('✅ confirm监控已恢复');
+    };
+}
+
+// 3. 测试删除功能
+function testDeleteFunction() {
+    console.log('🗑️ 开始测试删除功能...');
+    
+    const { conversations, deleteButtons } = checkPageStatus();
+    
+    if (deleteButtons.length === 0) {
+        console.log('❌ 没有找到删除按钮，请确保有对话存在');
+        return;
+    }
+    
+    console.log('✅ 找到删除按钮，准备测试...');
+    console.log('⚠️ 请注意：点击删除按钮后，会弹出确认对话框');
+    console.log('📝 建议：先点击"取消"测试取消功能，再点击"确定"测试删除功能');
+    
+    // 点击第一个删除按钮
+    const firstDeleteButton = deleteButtons[0];
+    console.log('🎯 准备点击第一个删除按钮...');
+    
+    // 添加点击事件监听
+    firstDeleteButton.addEventListener('click', function(e) {
+        console.log('🖱️ 删除按钮被点击');
+        console.log('- 事件对象:', e);
+        console.log('- 目标元素:', e.target);
+    }, { once: true });
+    
+    return firstDeleteButton;
+}
+
+// 4. 运行完整测试
+function runFullTest() {
+    console.log('🚀 运行完整删除功能测试...');
+    
+    // 开始监控
+    const stopMonitoring = monitorConfirm();
+    
+    // 检查页面
+    const deleteButton = testDeleteFunction();
+    
+    if (deleteButton) {
+        console.log('✅ 测试准备完成');
+        console.log('👆 现在可以点击删除按钮进行测试');
+        console.log('📋 测试步骤:');
+        console.log('1. 点击删除按钮');
+        console.log('2. 在确认对话框中点击"取消"');
+        console.log('3. 检查对话是否仍然存在');
+        console.log('4. 再次点击删除按钮');
+        console.log('5. 在确认对话框中点击"确定"');
+        console.log('6. 检查对话是否被删除');
+        
+        // 5秒后停止监控
+        setTimeout(() => {
+            stopMonitoring();
+            console.log('⏰ 监控已自动停止');
+        }, 30000);
+    }
+}
+
+// 启动测试
+runFullTest();
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>📊 测试日志</h3>
+        <div class="log" id="testLog">等待测试结果...</div>
+        <button class="test-button" onclick="clearLog()">清空日志</button>
+    </div>
+
+    <script>
+        function openApp() {
+            window.open('http://localhost:5173/', '_blank');
+            log('✅ 已打开应用页面');
+        }
+
+        function copyTestScript() {
+            const script = document.getElementById('testScript').textContent;
+            navigator.clipboard.writeText(script).then(() => {
+                log('✅ 测试脚本已复制到剪贴板');
+                alert('测试脚本已复制！请在应用页面的控制台中粘贴并运行。');
+            }).catch(err => {
+                log('❌ 复制失败: ' + err);
+            });
+        }
+
+        function checkAPI() {
+            log('🔍 检查API状态...');
+            fetch('http://localhost:3001/api/messages/conversations')
+                .then(response => response.json())
+                .then(data => {
+                    log('✅ API响应正常');
+                    log('📊 当前对话数量: ' + (data.length || 0));
+                    if (data.length > 0) {
+                        log('📝 第一个对话: ' + JSON.stringify(data[0], null, 2));
+                    }
+                })
+                .catch(error => {
+                    log('❌ API请求失败: ' + error);
+                });
+        }
+
+        function log(message) {
+            const logElement = document.getElementById('testLog');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('testLog').textContent = '日志已清空...\n';
+        }
+
+        // 页面加载完成后的初始化
+        window.onload = function() {
+            log('🚀 删除功能测试页面已加载');
+            log('📋 请按照说明进行测试');
+        };
+    </script>
+</body>
+</html>
