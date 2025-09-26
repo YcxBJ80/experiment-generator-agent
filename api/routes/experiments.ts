@@ -139,6 +139,7 @@ You follow this pipeline for every request:
      * Add visual indicators like trails, paths, force vectors, field lines, or wave propagations
      * Use color changes, size variations, and movement to show state changes
      * Include loading animations and smooth transitions between different states
+     * Add an button for the user to control the particle system (close the system or not)
    
    - SPECIFIC ANIMATION EXAMPLES TO IMPLEMENT:
      * For fluid dynamics: flowing particles, pressure visualization, streamlines
