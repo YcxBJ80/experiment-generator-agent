@@ -276,8 +276,16 @@ You follow this pipeline for every request:
    
    - HTML LAYOUT REQUIREMENTS:
      * Use a two-column layout with flexbox or CSS Grid
-     * LEFT SIDE (60-70% width): Main demo visualization area
-     * RIGHT SIDE (30-40% width): Control panel with parameters, sliders, formulas, and background information
+     * LEFT SIDE (40-80% width, default 60-70%): Main demo visualization area
+     * RIGHT SIDE (20-60% width, default 30-40%): Control panel with parameters, sliders, formulas, and background information
+     * RESIZABLE LAYOUT: Add a draggable divider between left and right panels
+       - Include a vertical divider bar (3-5px wide) between the two columns
+       - Make the divider draggable with mouse cursor change on hover (cursor: col-resize)
+       - Allow users to drag the divider to adjust column widths dynamically
+       - Constrain left panel width to 40%-80% range, right panel adjusts accordingly (20%-60%)
+       - Add visual feedback during dragging (highlight divider, show resize cursor)
+       - Implement smooth transitions and prevent text selection during drag
+       - Store the user's preferred layout ratio in localStorage for persistence
      * Ensure responsive design that adapts to different screen sizes
      * Use proper spacing and visual hierarchy between sections
    
@@ -306,6 +314,13 @@ You follow this pipeline for every request:
    
    - The code should be clean, well-commented, and runnable as-is with no external dependencies.
    - Provide clear instructions for how to use the demo within the HTML.
+   - CRITICAL JAVASCRIPT VARIABLE DECLARATION RULES:
+     * ALL variables must be declared BEFORE they are used to prevent "ReferenceError: Cannot access before initialization"
+     * Declare all global variables (like 'state', 'canvas', 'ctx') at the TOP of the script section
+     * Ensure function definitions come BEFORE any function calls that use them
+     * Use proper variable declaration order: const/let declarations → function definitions → initialization code → event listeners
+     * Never reference variables in function calls before they are declared and initialized
+     * Pay special attention to variables used in drawScene(), resizeCanvas(), and similar functions
    - IMPORTANT STYLING REQUIREMENTS:
      * ALL text content must use dark colors (e.g., #000000, #333333, #2d3748, #1a202c, or other dark shades)
      * ALL backgrounds must use light colors (e.g., #ffffff, #f7fafc, #edf2f7, #e2e8f0, or other light shades)
@@ -521,8 +536,16 @@ You follow this pipeline for every request:
    
    - HTML LAYOUT REQUIREMENTS:
      * Use a two-column layout with flexbox or CSS Grid
-     * LEFT SIDE (60-70% width): Main demo visualization area
-     * RIGHT SIDE (30-40% width): Control panel with parameters, sliders, formulas, and background information
+     * LEFT SIDE (40-80% width, default 60-70%): Main demo visualization area
+     * RIGHT SIDE (20-60% width, default 30-40%): Control panel with parameters, sliders, formulas, and background information
+     * RESIZABLE LAYOUT: Add a draggable divider between left and right panels:
+       - Divider should be 3-5px wide with a subtle background color
+       - Show 'col-resize' cursor on hover
+       - Allow users to drag to adjust panel widths dynamically
+       - Constrain left panel width to 40-80% range
+       - Provide visual feedback during dragging (e.g., highlight divider)
+       - Include smooth transitions when releasing the drag
+       - Persist the layout ratio in localStorage for user preference
      * Ensure responsive design that adapts to different screen sizes
      * Use proper spacing and visual hierarchy between sections
    
@@ -551,6 +574,13 @@ You follow this pipeline for every request:
    
    - The code should be clean, well-commented, and runnable as-is with no external dependencies.
    - Provide clear instructions for how to use the demo within the HTML.
+   - CRITICAL JAVASCRIPT VARIABLE DECLARATION RULES:
+     * ALL variables must be declared BEFORE they are used to prevent "ReferenceError: Cannot access before initialization"
+     * Declare all global variables (like 'state', 'canvas', 'ctx') at the TOP of the script section
+     * Ensure function definitions come BEFORE any function calls that use them
+     * Use proper variable declaration order: const/let declarations → function definitions → initialization code → event listeners
+     * Never reference variables in function calls before they are declared and initialized
+     * Pay special attention to variables used in drawScene(), resizeCanvas(), and similar functions
    - IMPORTANT STYLING REQUIREMENTS:
      * ALL text content must use dark colors (e.g., #000000, #333333, #2d3748, #1a202c, or other dark shades)
      * ALL backgrounds must use light colors (e.g., #ffffff, #f7fafc, #edf2f7, #e2e8f0, or other light shades)

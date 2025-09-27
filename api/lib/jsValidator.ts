@@ -566,6 +566,113 @@ export class JavaScriptValidator {
       }
     }
     
+    // Check for variable usage before declaration (TDZ - Temporal Dead Zone)
+    const variableUsageBeforeDeclaration = this.checkVariableUsageOrder(code);
+    if (!variableUsageBeforeDeclaration.isValid) {
+      errors.push(...variableUsageBeforeDeclaration.errors);
+      suggestions.push(...variableUsageBeforeDeclaration.suggestions);
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors,
+      suggestions
+    };
+  }
+  
+  /**
+   * Check for variable usage before declaration (Temporal Dead Zone issues)
+   */
+  private static checkVariableUsageOrder(code: string): ValidationResult {
+    const errors: string[] = [];
+    const suggestions: string[] = [];
+    
+    // Split code into lines for analysis
+    const lines = code.split('\n');
+    const declaredVariables = new Map<string, number>(); // variable name -> line number
+    const usedVariables = new Map<string, number[]>(); // variable name -> array of line numbers
+    
+    // First pass: find all variable declarations
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Match const, let, var declarations
+      const declPattern = /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)(?:\s*=|\s*;|\s*,)/g;
+      let match;
+      while ((match = declPattern.exec(line)) !== null) {
+        const varName = match[1];
+        if (!declaredVariables.has(varName)) {
+          declaredVariables.set(varName, i);
+        }
+      }
+      
+      // Match function declarations
+      const funcPattern = /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
+      while ((match = funcPattern.exec(line)) !== null) {
+        const funcName = match[1];
+        if (!declaredVariables.has(funcName)) {
+          declaredVariables.set(funcName, i);
+        }
+      }
+    }
+    
+    // Second pass: find variable usage
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Skip lines that are declarations themselves
+      if (/^\s*(?:const|let|var|function)\s/.test(line)) {
+        continue;
+      }
+      
+      // Find variable usage (excluding property access and string literals)
+      for (const [varName] of declaredVariables) {
+        // Create regex to match variable usage
+        const usagePattern = new RegExp(`\\b${varName}\\b(?!\\s*:)`, 'g');
+        
+        // Skip if this line contains the variable in a string literal
+        const stringLiteralPattern = /['"`][^'"\`]*['"`]/g;
+        const cleanLine = line.replace(stringLiteralPattern, '');
+        
+        if (usagePattern.test(cleanLine)) {
+          if (!usedVariables.has(varName)) {
+            usedVariables.set(varName, []);
+          }
+          usedVariables.get(varName)!.push(i);
+        }
+      }
+    }
+    
+    // Check for usage before declaration
+    for (const [varName, usageLines] of usedVariables) {
+      const declarationLine = declaredVariables.get(varName);
+      if (declarationLine !== undefined) {
+        for (const usageLine of usageLines) {
+          if (usageLine < declarationLine) {
+            errors.push(`Variable '${varName}' is used before declaration at line ${usageLine + 1}, but declared at line ${declarationLine + 1}`);
+            suggestions.push(`Move the declaration of '${varName}' before its first usage, or move the usage after the declaration`);
+          }
+        }
+      }
+    }
+    
+    // Special check for common patterns that cause TDZ errors
+    const statePattern = /\bstate\b/g;
+    const stateMatches = [...code.matchAll(statePattern)];
+    if (stateMatches.length > 0) {
+      // Check if state is used in function calls before being declared
+      const functionCallPattern = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\bstate\b[^)]*\)/g;
+      const funcCallMatches = [...code.matchAll(functionCallPattern)];
+      
+      for (const match of funcCallMatches) {
+        const funcName = match[1];
+        if (funcName === 'drawScene' || funcName === 'resizeCanvas') {
+          errors.push(`Function '${funcName}' uses 'state' variable which may not be initialized yet`);
+          suggestions.push(`Ensure 'state' variable is declared and initialized before calling '${funcName}' function`);
+        }
+      }
+    }
+    
     return {
       isValid: errors.length === 0,
       errors,
