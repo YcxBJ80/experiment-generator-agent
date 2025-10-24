@@ -38,7 +38,7 @@ export class PerplexityMCPClient {
       // Create transport layer - assuming perplexity-mcp-zerver is installed
       this.transport = new StdioClientTransport({
         command: 'node',
-        args: ['/Users/yangchengxuan/Desktop/hackathone2/perplexity-mcp-zerver/build/index.js'],
+        args: ['/Users/yangchengxuan/Desktop/PROJECTS/Experiment Visualizer/experiment-generator-agent/perplexity-mcp-zerver/build/index.js'],
         env: process.env
       });
 

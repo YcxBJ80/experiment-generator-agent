@@ -1,0 +1,593 @@
+# AI实验可视化平台 - 技术架构文档
+
+## 项目概述
+
+这是一个基于AI的实验可视化平台，用户可以通过自然语言描述实验需求，系统会自动生成交互式的HTML实验演示。平台集成了Perplexity AI进行知识检索，使用OpenAI/OpenRouter进行实验代码生成，并提供完整的对话管理和用户反馈系统。
+
+### 核心功能
+- 🤖 AI驱动的实验生成：通过自然语言描述生成交互式实验演示
+- 🔍 智能知识检索：集成Perplexity MCP获取准确的科学知识
+- 💬 对话式交互：支持多轮对话和历史记录管理
+- 📊 实时流式响应：支持SSE流式生成，提供实时反馈
+- 📝 用户反馈系统：收集实验质量评价和改进建议
+- 🎨 现代化UI：基于React和Tailwind CSS的响应式界面
+
+## 技术栈
+
+### 前端技术栈
+- **框架**: React 18.3.1 + TypeScript
+- **构建工具**: Vite 4.4.1
+- **路由**: React Router DOM 7.3.0
+- **状态管理**: Zustand 5.0.3
+- **UI框架**: Tailwind CSS 3.0
+- **图标库**: Lucide React 0.511.0
+- **HTTP客户端**: Axios 1.11.0
+- **工具库**: 
+  - clsx 2.1.1 (条件类名)
+  - tailwind-merge 3.0.2 (类名合并)
+  - react-bits 1.0.5 (UI组件)
+
+### 后端技术栈
+- **运行时**: Node.js + TypeScript
+- **框架**: Express.js 4.21.2
+- **开发工具**: 
+  - tsx (TypeScript执行器)
+  - nodemon 3.1.10 (热重载)
+  - concurrently 9.2.0 (并发运行)
+- **AI集成**:
+  - OpenAI SDK 5.12.1
+  - Model Context Protocol (MCP) SDK 1.17.2
+- **数据库**: Supabase (PostgreSQL)
+- **验证**: Zod 4.0.15
+- **环境配置**: dotenv 17.2.1
+- **跨域**: CORS 2.8.5
+
+### 部署和基础设施
+- **部署平台**: Vercel
+- **数据库**: Supabase (托管PostgreSQL)
+- **AI服务**: OpenRouter (多模型API网关)
+- **知识检索**: Perplexity AI (通过MCP协议)
+
+## 项目架构
+
+### 整体架构图
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   前端 (React)   │    │  后端 (Express)  │    │  外部服务集成    │
+│                 │    │                 │    │                 │
+│ • 用户界面       │◄──►│ • API路由       │◄──►│ • OpenAI/Router │
+│ • 状态管理       │    │ • 业务逻辑       │    │ • Perplexity AI │
+│ • 路由管理       │    │ • 数据验证       │    │ • Supabase DB   │
+│ • 组件系统       │    │ • 流式响应       │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+### 目录结构
+```
+experiment-generator-agent/
+├── api/                          # 后端API服务
+│   ├── app.ts                   # Express应用配置
+│   ├── server.ts                # 本地开发服务器
+│   ├── index.ts                 # Vercel部署入口
+│   ├── lib/                     # 核心库文件
+│   │   ├── supabase.ts         # 数据库服务
+│   │   ├── perplexityMcpClient.ts # Perplexity MCP客户端
+│   │   └── jsValidator.ts      # JavaScript代码验证
+│   ├── routes/                  # API路由
+│   │   ├── auth.ts             # 认证路由
+│   │   ├── experiments.ts      # 实验生成路由
+│   │   └── messages.ts         # 消息和对话路由
+│   └── services/               # 业务服务层
+├── src/                         # 前端源码
+│   ├── App.tsx                 # 应用根组件
+│   ├── main.tsx                # 应用入口
+│   ├── pages/                  # 页面组件
+│   │   ├── Home.tsx           # 主页面(对话界面)
+│   │   └── Demo.tsx           # 实验演示页面
+│   ├── components/             # 可复用组件
+│   │   ├── DonationButton.tsx # 捐赠按钮
+│   │   ├── SurveyModal.tsx    # 反馈问卷弹窗
+│   │   ├── LightRays.tsx      # 光线动画效果
+│   │   └── Empty.tsx          # 空状态组件
+│   ├── lib/                    # 工具库
+│   │   ├── api.ts             # API客户端
+│   │   └── utils.ts           # 工具函数
+│   └── hooks/                  # 自定义Hook
+│       └── useTheme.ts        # 主题管理
+├── supabase/                   # 数据库配置
+│   └── migrations/            # 数据库迁移文件
+├── perplexity-mcp-zerver/     # Perplexity MCP服务器
+└── 配置文件
+    ├── package.json           # 项目依赖
+    ├── vite.config.ts        # Vite配置
+    ├── tailwind.config.js    # Tailwind配置
+    ├── tsconfig.json         # TypeScript配置
+    └── vercel.json           # Vercel部署配置
+```
+
+## 数据库设计
+
+### 数据表结构
+
+#### messages表 (核心表)
+```sql
+CREATE TABLE messages (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  conversation_id UUID NOT NULL,
+  content TEXT NOT NULL,
+  type VARCHAR(20) NOT NULL CHECK (type IN ('user', 'assistant')),
+  experiment_id UUID,
+  html_content TEXT,
+  css_content TEXT,
+  js_content TEXT,
+  title TEXT,
+  is_conversation_root BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+**字段说明**:
+- `id`: 消息唯一标识
+- `conversation_id`: 对话ID，用于关联同一对话的消息
+- `content`: 消息内容
+- `type`: 消息类型 ('user' | 'assistant')
+- `experiment_id`: 实验ID，关联生成的实验
+- `html_content/css_content/js_content`: 生成的实验代码
+- `title`: 对话标题
+- `is_conversation_root`: 是否为对话根消息
+- `created_at/updated_at`: 创建和更新时间
+
+#### surveys表 (反馈表)
+```sql
+CREATE TABLE surveys (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  experiment_id UUID NOT NULL,
+  reflects_real_world BOOLEAN NOT NULL,
+  visualization_rating INTEGER NOT NULL CHECK (visualization_rating >= 1 AND visualization_rating <= 10),
+  concept_understanding INTEGER NOT NULL CHECK (concept_understanding >= 1 AND concept_understanding <= 10),
+  suggestions TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+**字段说明**:
+- `experiment_id`: 关联的实验ID
+- `reflects_real_world`: 是否反映真实世界原理
+- `visualization_rating`: 可视化效果评分 (1-10)
+- `concept_understanding`: 概念理解度评分 (1-10)
+- `suggestions`: 改进建议
+
+### 数据关系
+- 一个对话包含多条消息
+- 一条助手消息可能包含一个实验
+- 一个实验可以有多个用户反馈
+
+## API接口设计
+
+### 基础路由结构
+```
+/api
+├── /auth                    # 认证相关 (预留)
+│   ├── GET  /health        # 健康检查
+│   ├── POST /login         # 登录
+│   ├── POST /register      # 注册
+│   └── POST /logout        # 登出
+├── /experiments            # 实验生成
+│   ├── POST /generate-stream # 流式生成实验
+│   ├── GET  /:id           # 获取实验详情
+│   └── POST /survey        # 提交反馈问卷
+└── /messages               # 消息和对话管理
+    ├── GET    /conversations                    # 获取对话列表
+    ├── POST   /conversations                    # 创建新对话
+    ├── PUT    /conversations/:id/title          # 更新对话标题
+    ├── DELETE /conversations/:id                # 删除对话
+    ├── GET    /conversations/:id/messages       # 获取对话消息
+    ├── POST   /conversations/:id/messages       # 创建消息
+    └── POST   /generate-stream                  # 流式生成 (主要接口)
+```
+
+### 核心接口详情
+
+#### 1. 流式实验生成
+```typescript
+POST /api/messages/generate-stream
+Content-Type: application/json
+
+Request:
+{
+  "prompt": "创建一个展示伯努利原理的实验",
+  "conversation_id": "uuid",
+  "message_id": "uuid",
+  "model": "openai/gpt-5-mini"
+}
+
+Response: (Server-Sent Events)
+data: {"type": "search_start", "message": "开始搜索相关知识..."}
+data: {"type": "search_complete", "knowledge": "伯努利原理相关知识..."}
+data: {"type": "generation_start", "message": "开始生成实验..."}
+data: {"type": "content", "content": "生成的HTML/CSS/JS代码片段"}
+data: {"type": "complete", "experiment_id": "uuid", "title": "实验标题"}
+```
+
+#### 2. 对话管理
+```typescript
+// 获取对话列表
+GET /api/messages/conversations
+Response: Conversation[]
+
+// 创建对话
+POST /api/messages/conversations
+Request: { "title": "新对话" }
+Response: Conversation
+
+// 获取对话消息
+GET /api/messages/conversations/:id/messages
+Response: Message[]
+```
+
+#### 3. 反馈提交
+```typescript
+POST /api/experiments/survey
+Request: {
+  "experiment_id": "uuid",
+  "reflects_real_world": true,
+  "visualization_rating": 8,
+  "concept_understanding": 9,
+  "suggestions": "建议增加更多交互元素"
+}
+Response: { "survey_id": "uuid", "message": "反馈提交成功" }
+```
+
+## 前端设计
+
+### 组件架构
+```
+App
+├── Router
+    ├── Home (主页面)
+    │   ├── 侧边栏 (对话列表)
+    │   ├── 主聊天区域
+    │   │   ├── 消息列表
+    │   │   ├── 输入框
+    │   │   └── 模型选择器
+    │   └── SurveyModal (反馈弹窗)
+    └── Demo (实验演示页面)
+        ├── 返回按钮
+        └── 实验iframe
+```
+
+### 状态管理
+使用Zustand进行轻量级状态管理：
+- 对话列表状态
+- 当前对话状态
+- 消息流状态
+- UI状态 (侧边栏开关、加载状态等)
+
+### 关键特性
+
+#### 1. 流式响应处理
+```typescript
+// 处理SSE流式响应
+const handleStreamResponse = async (response: Response) => {
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+  
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    
+    const chunk = decoder.decode(value);
+    const lines = chunk.split('\n');
+    
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = JSON.parse(line.slice(6));
+        handleStreamData(data);
+      }
+    }
+  }
+};
+```
+
+#### 2. 实验渲染
+```typescript
+// 在iframe中安全渲染实验代码
+const renderExperiment = (experiment: ExperimentData) => {
+  const iframe = document.getElementById('experiment-iframe') as HTMLIFrameElement;
+  const fullHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>${experiment.css_content}</style>
+    </head>
+    <body>
+      ${experiment.html_content}
+      <script>${experiment.js_content}</script>
+    </body>
+    </html>
+  `;
+  iframe.srcdoc = fullHtml;
+};
+```
+
+#### 3. 响应式设计
+- 移动端适配的侧边栏
+- 灵活的布局系统
+- 触摸友好的交互元素
+
+## 核心业务流程
+
+### 1. 实验生成流程
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Frontend as 前端
+    participant Backend as 后端
+    participant Perplexity as Perplexity AI
+    participant OpenAI as OpenAI/Router
+    participant DB as 数据库
+
+    User->>Frontend: 输入实验需求
+    Frontend->>Backend: POST /generate-stream
+    Backend->>Perplexity: 搜索相关知识
+    Perplexity-->>Backend: 返回科学知识
+    Backend->>OpenAI: 生成实验代码
+    OpenAI-->>Backend: 流式返回代码
+    Backend-->>Frontend: SSE流式响应
+    Frontend-->>User: 实时显示生成过程
+    Backend->>DB: 保存消息和实验
+    Frontend->>User: 显示完成的实验
+```
+
+### 2. 对话管理流程
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Frontend as 前端
+    participant Backend as 后端
+    participant DB as 数据库
+
+    User->>Frontend: 访问应用
+    Frontend->>Backend: 获取对话列表
+    Backend->>DB: 查询conversations
+    DB-->>Backend: 返回对话数据
+    Backend-->>Frontend: 对话列表
+    Frontend-->>User: 显示历史对话
+
+    User->>Frontend: 选择/创建对话
+    Frontend->>Backend: 获取消息历史
+    Backend->>DB: 查询messages
+    DB-->>Backend: 返回消息列表
+    Backend-->>Frontend: 消息历史
+    Frontend-->>User: 显示对话内容
+```
+
+## 外部服务集成
+
+### 1. Perplexity AI集成 (MCP协议)
+```typescript
+// MCP客户端配置
+class PerplexityMCPClient {
+  private client: Client;
+  private transport: StdioClientTransport;
+
+  async search(query: string, responseType: 'brief' | 'normal' | 'detailed') {
+    return await this.client.request({
+      method: 'tools/call',
+      params: {
+        name: 'search',
+        arguments: { query, response_type: responseType }
+      }
+    });
+  }
+
+  async getExperimentKnowledge(topic: string) {
+    const searchResult = await this.search(
+      `${topic} 物理原理 科学实验 可视化演示`,
+      'detailed'
+    );
+    return searchResult.content;
+  }
+}
+```
+
+### 2. OpenAI/OpenRouter集成
+```typescript
+// OpenAI客户端配置
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_BASE_URL || 'https://openrouter.ai/api/v1'
+});
+
+// 流式生成实验
+const stream = await openai.chat.completions.create({
+  model: selectedModel,
+  messages: [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt }
+  ],
+  stream: true,
+  temperature: 0.7,
+  max_tokens: 4000
+});
+```
+
+### 3. Supabase数据库集成
+```typescript
+// Supabase客户端配置
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY,
+  {
+    auth: { persistSession: false }
+  }
+);
+
+// 数据库操作示例
+class DatabaseService {
+  static async createMessage(message: MessageData) {
+    const { data, error } = await supabase
+      .from('messages')
+      .insert(message)
+      .select()
+      .single();
+    
+    return error ? null : data;
+  }
+}
+```
+
+## 部署配置
+
+### Vercel部署配置
+```json
+// vercel.json
+{
+  "functions": {
+    "api/index.ts": {
+      "runtime": "@vercel/node"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.ts"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PUT, DELETE, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
+      ]
+    }
+  ]
+}
+```
+
+### 环境变量配置
+```bash
+# .env
+# OpenAI/OpenRouter配置
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+
+# Supabase配置
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# 服务器配置
+PORT=3001
+NODE_ENV=development
+```
+
+## 开发和构建
+
+### 开发环境启动
+```bash
+# 安装依赖
+npm install
+
+# 启动开发服务器 (前端+后端)
+npm run dev
+
+# 单独启动前端
+npm run client:dev
+
+# 单独启动后端
+npm run server:dev
+```
+
+### 构建和部署
+```bash
+# 构建前端
+npm run build
+
+# 类型检查
+npm run check
+
+# 代码检查
+npm run lint
+
+# 预览构建结果
+npm run preview
+```
+
+## 安全考虑
+
+### 1. 代码安全
+- JavaScript代码验证和清理
+- HTML标签过滤
+- XSS防护
+
+### 2. API安全
+- CORS配置
+- 请求大小限制
+- 错误信息脱敏
+
+### 3. 数据安全
+- 数据库RLS策略
+- 敏感信息环境变量管理
+- 用户输入验证
+
+## 性能优化
+
+### 1. 前端优化
+- 代码分割和懒加载
+- 图片和资源优化
+- 缓存策略
+
+### 2. 后端优化
+- 数据库索引优化
+- API响应缓存
+- 流式响应减少延迟
+
+### 3. 部署优化
+- CDN加速
+- 服务器端渲染
+- 资源压缩
+
+## 扩展性设计
+
+### 1. 模块化架构
+- 插件化的AI模型支持
+- 可扩展的实验类型
+- 灵活的知识源集成
+
+### 2. 微服务架构准备
+- 独立的服务模块
+- API网关设计
+- 服务间通信协议
+
+### 3. 多租户支持
+- 用户认证系统
+- 数据隔离
+- 权限管理
+
+## 监控和日志
+
+### 1. 应用监控
+- 性能指标收集
+- 错误追踪
+- 用户行为分析
+
+### 2. 日志管理
+- 结构化日志
+- 日志聚合
+- 告警机制
+
+## 总结
+
+这个AI实验可视化平台采用了现代化的全栈架构，具有以下特点：
+
+1. **技术先进性**: 使用最新的React、TypeScript、Express等技术栈
+2. **AI集成深度**: 深度集成多个AI服务，提供智能化的实验生成
+3. **用户体验优秀**: 流式响应、实时反馈、响应式设计
+4. **架构可扩展**: 模块化设计，易于扩展和维护
+5. **部署简单**: 基于Vercel的无服务器部署，运维成本低
+
+该架构文档为重新实现这个项目提供了完整的技术指导，包含了所有必要的技术细节和实现要点。
