@@ -6,8 +6,8 @@ const router = express.Router();
 // Get all sessions
 router.get('/', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
-    const sessions = await DatabaseService.getSessions();
-    res.json(sessions);
+    const conversations = await DatabaseService.getConversations();
+    res.json(conversations);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch sessions' });
   }
@@ -16,13 +16,13 @@ router.get('/', async (req: ExpressRequest, res: ExpressResponse) => {
 // Create new session
 router.post('/', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
-    const { title, session_type } = req.body;
+    const { title } = req.body;
     
     if (!title) {
       return res.status(400).json({ error: 'Title cannot be empty' });
     }
     
-    const session = await DatabaseService.createSession(title, session_type || 'conversation');
+    const session = await DatabaseService.createConversation(title);
     
     if (!session) {
       return res.status(500).json({ error: 'Failed to create session' });
@@ -51,7 +51,7 @@ router.get('/:sessionId/messages', async (req: ExpressRequest, res: ExpressRespo
 router.post('/:sessionId/messages', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { sessionId } = req.params;
-    const { role, content, title, session_type } = req.body;
+    const { role, content, title } = req.body;
     
     if (!role || !['user', 'assistant'].includes(role)) {
       return res.status(400).json({ error: 'role must be user or assistant' });
@@ -61,12 +61,13 @@ router.post('/:sessionId/messages', async (req: ExpressRequest, res: ExpressResp
       return res.status(400).json({ error: 'User message content cannot be empty' });
     }
     
+    const normalizedRole = role as 'user' | 'assistant';
+    
     const message = await DatabaseService.createMessage({
-      session_id: sessionId,
-      type: role,
+      conversation_id: sessionId,
+      type: normalizedRole,
       content: content || '',
-      title: title,
-      session_type: session_type || 'conversation'
+      title
     });
     
     if (!message) {
@@ -90,7 +91,7 @@ router.put('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
       return res.status(400).json({ error: 'Title cannot be empty' });
     }
     
-    const success = await DatabaseService.updateSessionTitle(id, title);
+    const success = await DatabaseService.updateConversationTitle(id, title);
     
     if (!success) {
       return res.status(500).json({ error: 'Failed to update session' });
@@ -108,7 +109,7 @@ router.delete('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { id } = req.params;
     
-    const success = await DatabaseService.deleteSession(id);
+    const success = await DatabaseService.deleteConversation(id);
     
     if (!success) {
       return res.status(500).json({ error: 'Failed to delete session' });

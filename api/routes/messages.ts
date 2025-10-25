@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { perplexityMCPClient } from '../lib/perplexityMcpClient.js';
 import { JavaScriptValidator } from '../lib/jsValidator.js';
-import { DatabaseService } from '../lib/supabase.js';
+import { DatabaseService, type Message as DbMessage } from '../lib/supabase.js';
 
 // Ensure environment variables are loaded
 const __filename = fileURLToPath(import.meta.url);
@@ -176,6 +176,7 @@ try {
 interface GenerateExperimentRequest {
   prompt: string;
   conversation_id?: string;
+  model?: string;
 }
 
 interface GenerateExperimentResponse {
@@ -196,41 +197,10 @@ interface GenerateExperimentResponse {
   status: string;
 }
 
-/**
- * Generate experiment demo with streaming
- */
-router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse) => {
-  console.log('🔥 Stream endpoint called!');
-    console.log('Request body:', req.body);
-  try {
-    const { prompt, conversation_id, message_id, model }: GenerateExperimentRequest & { message_id?: string } = req.body;
-    
-    // Set default model if not provided
-    const selectedModel = model || 'openrouter/andromeda-alpha';
+type ChatHistoryMessage = { role: 'user' | 'assistant'; content: string };
 
-    if (!prompt) {
-      return res.status(400).json({
-        success: false,
-        error: 'Please provide experiment requirement description'
-      });
-    }
-
-    // Set SSE response headers
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Cache-Control'
-    });
-
-    // First get relevant knowledge through Perplexity MCP
-    console.log('Getting Perplexity knowledge...');
-    const perplexityKnowledge = await perplexityMCPClient.getExperimentKnowledge(prompt);
-    console.log('Perplexity knowledge retrieval completed');
-
-    // Build system prompt
-    const systemPrompt = `You are an AI agent specialized in creating highly interactive and visually stunning HTML-based experiment demos with rich animations and dynamic visualizations.
+function buildExperimentSystemPrompt(userPrompt: string, knowledge: string): string {
+  return `You are an AI agent specialized in creating highly interactive and visually stunning HTML-based experiment demos with rich animations and dynamic visualizations.
 
 
 You follow this pipeline for every request:
@@ -341,33 +311,146 @@ General Rules:
 - If the request is vague, ask questions before starting.
 - If something is physically dangerous, simulate it safely instead of providing real-life unsafe instructions.
 
-User request: "${prompt}"
+User request: "${userPrompt}"
+
+You have the following Perplexity knowledge available (already retrieved):
+${knowledge}
+
+Now produce the summary followed by a complete, standalone HTML document inside a fenced code block labeled html. Focus heavily on creating stunning animations and visual effects that make the concepts come alive. Do not include any external URLs or dependencies.`;
+}
+
+function buildChatSystemPrompt(perplexityKnowledge: string): string {
+  return `You are a scientific conversation copilot who continues assisting after an interactive experiment demo has been generated. Use the conversation history that follows this system message to preserve context, reference earlier demos, and answer follow-up questions with precise, actionable guidance.
+
+Perplexity MCP tools remain available whenever you need fresh, factual insights:
+  * search: Execute search queries on Perplexity.ai with brief/normal/detailed response types
+  * get_documentation: Request documentation and examples for technologies/libraries
+  * find_apis: Find and evaluate APIs based on requirements and context
+  * check_deprecated_code: Analyze code snippets for deprecated features
+  * extract_url_content: Extract main article content from URLs using browser automation
+  * chat_perplexity: Maintain continuous conversation with Perplexity AI
+
+Call a tool only when it materially improves the answer, and cite Perplexity when you rely on its findings. Default to concise prose responses; supply focused code snippets or parameter changes when they help, but do not regenerate full HTML demos unless the user explicitly asks.
 
 You have the following Perplexity knowledge available (already retrieved):
 ${perplexityKnowledge}
 
-Now produce the summary followed by a complete, standalone HTML document inside a fenced code block labeled html. Focus heavily on creating stunning animations and visual effects that make the concepts come alive. Do not include any external URLs or dependencies.`;
+Incorporate this context when it is relevant. If it is not applicable, acknowledge that and proceed with your best informed guidance.`;
+}
 
-    // Call OpenAI API to generate experiment (streaming)
+function mapMessageToChatEntry(message: DbMessage): ChatHistoryMessage | null {
+  const trimmedContent = (message.content || '').trim();
+
+  if (!trimmedContent && !message.experiment_id) {
+    return null;
+  }
+
+  if (message.type === 'assistant' && message.experiment_id) {
+    const [summaryPart] = trimmedContent.split('```html');
+    const summary = summaryPart?.trim();
+    const fallbackSummary = summary && summary.length > 0
+      ? summary
+      : 'I previously generated an interactive HTML experiment demo for you.';
+    return {
+      role: 'assistant',
+      content: `${fallbackSummary}\n\n[Experiment HTML omitted for brevity. Experiment ID: ${message.experiment_id}]`
+    };
+  }
+
+  return {
+    role: message.type,
+    content: trimmedContent
+  };
+}
+
+function buildChatHistory(messages: DbMessage[], placeholderId?: string): ChatHistoryMessage[] {
+  return messages
+    .filter(msg => !msg.is_conversation_root)
+    .filter(msg => msg.id !== placeholderId)
+    .map(mapMessageToChatEntry)
+    .filter((entry): entry is ChatHistoryMessage => Boolean(entry));
+}
+
+/**
+ * Generate experiment demo with streaming
+ */
+router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse) => {
+  console.log('🔥 Stream endpoint called!');
+  console.log('Request body:', req.body);
+  try {
+    const { prompt, conversation_id, message_id, model }: GenerateExperimentRequest & { message_id?: string } = req.body;
+    
+    const selectedModel = model || 'openrouter/andromeda-alpha';
+
+    if (!prompt) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide experiment requirement description'
+      });
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    let chatHistory: ChatHistoryMessage[] = [];
+
+    if (conversation_id) {
+      try {
+        const conversationMessages = await DatabaseService.getMessages(conversation_id);
+        chatHistory = buildChatHistory(conversationMessages, message_id);
+      } catch (historyError) {
+        console.error('Failed to load conversation history:', historyError);
+        chatHistory = [];
+      }
+    }
+
+    const isFirstTurn = chatHistory.length <= 1;
+    console.log('Conversation history length:', chatHistory.length, 'isFirstTurn:', isFirstTurn);
+
+    console.log('Getting Perplexity knowledge...');
+    const perplexityKnowledge = await perplexityMCPClient.getExperimentKnowledge(prompt);
+    console.log('Perplexity knowledge retrieval completed');
+
+    const mode: 'experiment' | 'chat' = isFirstTurn ? 'experiment' : 'chat';
+    console.log(`🧭 Conversation mode for this request: ${mode}`);
+
+    const systemPrompt = mode === 'experiment'
+      ? buildExperimentSystemPrompt(prompt, perplexityKnowledge)
+      : buildChatSystemPrompt(perplexityKnowledge);
+
+    let openAIMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+
+    if (mode === 'experiment') {
+      openAIMessages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt }
+      ];
+    } else {
+      openAIMessages = [
+        { role: 'system', content: systemPrompt },
+        ...chatHistory
+      ];
+
+      if (!chatHistory.length || chatHistory[chatHistory.length - 1].role !== 'user') {
+        openAIMessages.push({ role: 'user', content: prompt });
+      }
+    }
+
     console.log('🔍 Checking openai client status:', !!openai);
     if (openai) {
       try {
         console.log('🚀 Starting streaming OpenAI API call...');
         console.log('Model:', selectedModel);
-        console.log('Prompt length:', prompt.length);
+        console.log('Payload message count:', openAIMessages.length);
         
         const stream = await openai.chat.completions.create({
           model: selectedModel,
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
+          messages: openAIMessages,
           temperature: 0.7,
           max_tokens: 40000,
           stream: true
@@ -375,80 +458,90 @@ Now produce the summary followed by a complete, standalone HTML document inside 
 
         let fullContent = '';
         let chunkCount = 0;
+        let experimentId: string | null = null;
+        let hasUpdatedExperimentId = false;
         
         for await (const chunk of stream) {
-          if (chunk.choices && chunk.choices[0] && chunk.choices[0].delta && chunk.choices[0].delta.content) {
-            const content = chunk.choices[0].delta.content;
+          const content = chunk.choices?.[0]?.delta?.content;
+          if (content) {
             fullContent += content;
             chunkCount++;
             
-            // Send SSE format streaming data to frontend
             res.write(`data: ${content}\n\n`);
             
+            if (mode === 'experiment' && message_id && !hasUpdatedExperimentId && fullContent.includes('```html')) {
+              try {
+                experimentId = randomUUID();
+                console.log('🔧 HTML code block detected, setting experiment_id immediately:', experimentId);
+                
+                await DatabaseService.updateMessage(message_id, {
+                  experiment_id: experimentId
+                });
+                
+                hasUpdatedExperimentId = true;
+                console.log('✅ experiment_id stored early for streaming message');
+              } catch (updateError) {
+                console.error('❌ Failed to set experiment_id during stream:', updateError);
+              }
+            }
+
             if (chunkCount % 10 === 0) {
               console.log(`📦 Sent ${chunkCount} chunks, current length: ${fullContent.length}`);
             }
           }
         }
         
-        // Send completion signal
         res.write('data: [DONE]\n\n');
         res.end();
         
         console.log('✅ Streaming response completed, total chunks:', chunkCount, 'total length:', fullContent.length);
         
-        // After streaming response is complete, create experiment record and update message
-        if (fullContent && message_id) {
-          try {
-            console.log('🔧 Starting to process experiment data and update message...');
-            
-            // Parse generated content, extract HTML code block
-            const htmlMatch = fullContent.match(/```html\s*([\s\S]*?)\s*```/);
-            if (htmlMatch) {
-              const htmlContent = htmlMatch[1].trim();
+        if (message_id && fullContent) {
+          if (mode === 'experiment') {
+            try {
+              console.log('🔧 Processing experiment output and updating message...');
               
-              // Generate experiment ID
-              const experiment_id = randomUUID();
-              
-              // Extract title from HTML content (if any)
-              const titleMatch = htmlContent.match(/<title>(.*?)<\/title>/i);
-              const title = titleMatch ? titleMatch[1] : 'Experiment Demo';
-              
-              // Create experiment record (simplified here, should have complete experiment data structure)
-              const experimentData = {
-                experiment_id,
-                title,
-                description: `Experiment demo generated based on prompt "${prompt}"`,
-                html_content: htmlContent,
-                css_content: '', // Streaming generates complete HTML, CSS is embedded
-                js_content: '',  // Streaming generates complete HTML, JS is embedded
-                parameters: [],
-                status: 'completed'
-              };
-              
-              console.log('📝 Experiment data prepared, experiment_id:', experiment_id);
-              
-              // Update message, add experiment_id and content
-              await DatabaseService.updateMessage(message_id, {
-                content: fullContent,
-                experiment_id: experiment_id,
-                html_content: htmlContent
-              });
-              
-              console.log('✅ Message update completed, added experiment_id:', experiment_id);
-            } else {
-              console.warn('⚠️ Failed to extract HTML code block from generated content');
+              const htmlMatch = fullContent.match(/```html\s*([\s\S]*?)\s*```/);
+              if (htmlMatch) {
+                const htmlContent = htmlMatch[1].trim();
+                const resolvedExperimentId = experimentId || randomUUID();
+                
+                const titleMatch = htmlContent.match(/<title>(.*?)<\/title>/i);
+                const title = titleMatch ? titleMatch[1] : 'Experiment Demo';
+                
+                await DatabaseService.updateMessage(message_id, {
+                  content: fullContent,
+                  experiment_id: resolvedExperimentId,
+                  html_content: htmlContent
+                });
+                
+                console.log('✅ Message updated with experiment_id:', resolvedExperimentId, 'Title:', title);
+              } else {
+                console.warn('⚠️ Failed to extract HTML code block from generated content');
+                await DatabaseService.updateMessage(message_id, {
+                  content: fullContent
+                });
+              }
+            } catch (error) {
+              console.error('❌ Error processing experiment data or updating message:', error);
             }
-          } catch (error) {
-            console.error('❌ Error processing experiment data or updating message:', error);
+          } else {
+            try {
+              await DatabaseService.updateMessage(message_id, {
+                content: fullContent.trim()
+              });
+              console.log('✅ Chat response stored for message:', message_id);
+            } catch (error) {
+              console.error('❌ Failed to persist chat response:', error);
+            }
           }
         } else {
-          console.warn('⚠️ Missing fullContent or message_id, skipping experiment record creation');
+          console.warn('⚠️ Missing fullContent or message_id, skipping message update');
         }
         
       } catch (error) {
         console.error('OpenAI API call failed:', error);
-        res.write(`data: \n\n❌ Error occurred while generating experiment: ${error instanceof Error ? error.message : 'Unknown error'}\n\n`);
+        res.write(`data: \n\n❌ Error occurred while generating response: ${error instanceof Error ? error.message : 'Unknown error'}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
       }
@@ -459,11 +552,11 @@ Now produce the summary followed by a complete, standalone HTML document inside 
     }
     
   } catch (error) {
-    console.error('Experiment generation failed:', error);
+    console.error('Response generation failed:', error);
     if (!res.headersSent) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Experiment generation failed'
+        error: error instanceof Error ? error.message : 'Response generation failed'
       });
     }
   }

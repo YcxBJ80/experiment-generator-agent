@@ -1,10 +1,16 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, Send, Play, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { apiClient, type ExperimentData, type Conversation as ApiConversation, type Message as ApiMessage } from '@/lib/api';
 import LightRays from '../components/LightRays';
 import DonationButton from '../components/DonationButton';
 import SurveyModal from '../components/SurveyModal';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import remarkBreaks from 'remark-breaks';
+import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
 
 interface Message {
   id: string;
@@ -52,6 +58,17 @@ function Home() {
   // 问卷相关状态
   const [showSurveyModal, setShowSurveyModal] = useState(false);
   const [surveyExperimentId, setSurveyExperimentId] = useState<string>('');
+
+  const markdownRemarkPlugins = useMemo(() => [remarkGfm, remarkMath, remarkBreaks], []);
+  const markdownRehypePlugins = useMemo(() => [rehypeRaw, rehypeKatex], []);
+  const markdownComponents = useMemo(
+    () => ({
+      a: ({ node, ...props }: { node?: unknown; href?: string; children?: ReactNode }) => (
+        <a {...props} target="_blank" rel="noreferrer" />
+      ),
+    }),
+    []
+  );
 
   // 可选择的模型列表
   const availableModels = [
@@ -292,260 +309,320 @@ function Home() {
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    const trimmedMessage = inputMessage.trim();
+    if (!trimmedMessage || isGenerating) return;
     
-    const messageContent = inputMessage;
+    const messageContent = trimmedMessage;
+    const derivedTitle = messageContent.length > 20 
+      ? `${messageContent.substring(0, 20)}...`
+      : messageContent;
+    
     setInputMessage('');
     setIsGenerating(true);
     setIsSearchingGenerating(true);
-    
-    let newConversationId: string | null = null;
-    
+
+    let activeConversationId = currentConversation;
+    let conversationRecord = conversations.find(conv => conv.id === activeConversationId) || null;
+    let hadMessagesBeforeSend = conversationRecord ? conversationRecord.messages.length > 0 : false;
+
     try {
-      // 每次发送消息时都创建新对话
-      const newConversationTitle = messageContent.length > 20 
-        ? messageContent.substring(0, 20) + '...' 
-        : messageContent;
-      
-      const newConversationResponse = await apiClient.createConversation(newConversationTitle);
-      
-      if (!newConversationResponse.success || !newConversationResponse.data) {
-        throw new Error('Failed to create new conversation');
+      if (!activeConversationId) {
+        const newConversationResponse = await apiClient.createConversation(derivedTitle || 'New Conversation');
+        
+        if (!newConversationResponse.success || !newConversationResponse.data) {
+          throw new Error('Failed to create new conversation');
+        }
+
+        activeConversationId = newConversationResponse.data.id;
+        conversationRecord = {
+          id: newConversationResponse.data.id,
+          title: newConversationResponse.data.title,
+          messages: [],
+          lastUpdated: new Date(newConversationResponse.data.created_at)
+        };
+        hadMessagesBeforeSend = false;
+
+        setConversations(prev => [conversationRecord!, ...prev]);
+      } else if (!conversationRecord) {
+        conversationRecord = {
+          id: activeConversationId,
+          title: 'New Conversation',
+          messages: [],
+          lastUpdated: new Date()
+        };
+        hadMessagesBeforeSend = false;
+        setConversations(prev => {
+          if (prev.some(conv => conv.id === activeConversationId)) {
+            return prev;
+          }
+          return [conversationRecord!, ...prev];
+        });
       }
-      
-      const newConversation: Conversation = {
-        id: newConversationResponse.data.id,
-        title: newConversationResponse.data.title,
-        messages: [],
-        lastUpdated: new Date(newConversationResponse.data.created_at)
-      };
-      
-      // 将新对话添加到对话列表并切换到新对话
-      setConversations(prev => [newConversation, ...prev]);
-      setCurrentConversation(newConversationResponse.data.id);
-      
-      newConversationId = newConversationResponse.data.id;
-      // 保存用户消息到数据库
+
+      if (!activeConversationId) {
+        throw new Error('Conversation creation failed');
+      }
+
+      setCurrentConversation(activeConversationId);
+
+      if (!hadMessagesBeforeSend && conversationRecord && conversationRecord.title === 'New Conversation' && derivedTitle) {
+        const updateTitleResponse = await apiClient.updateConversationTitle(activeConversationId, derivedTitle);
+        if (updateTitleResponse.success) {
+          setConversations(prev => prev.map(conv => 
+            conv.id === activeConversationId
+              ? { ...conv, title: derivedTitle }
+              : conv
+          ));
+          conversationRecord = { ...conversationRecord, title: derivedTitle };
+        }
+      }
+
       const userMessageResponse = await apiClient.createMessage({
-        conversation_id: newConversationId,
+        conversation_id: activeConversationId,
         content: messageContent,
         type: 'user'
       });
       
-      if (userMessageResponse.success && userMessageResponse.data) {
-        const userMessage: Message = {
-          id: userMessageResponse.data.id,
-          content: userMessageResponse.data.content,
-          type: 'user',
-          timestamp: new Date(userMessageResponse.data.created_at)
-        };
-        
-        // 更新本地状态
-        setConversations(prev => prev.map(conv => {
-          if (conv.id === newConversationId) {
-            const updatedMessages = [...conv.messages, userMessage];
-            return { ...conv, messages: updatedMessages, lastUpdated: new Date() };
-          }
-          return conv;
-        }));
+      if (!userMessageResponse.success || !userMessageResponse.data) {
+        throw new Error('Failed to create user message');
       }
       
-      // 创建空的助手消息用于流式响应
+      const userMessage: Message = {
+        id: userMessageResponse.data.id,
+        content: userMessageResponse.data.content,
+        type: 'user',
+        timestamp: new Date(userMessageResponse.data.created_at)
+      };
+      
+      setConversations(prev => {
+        const updated = prev.map(conv =>
+          conv.id === activeConversationId
+            ? { ...conv, messages: [...conv.messages, userMessage], lastUpdated: new Date() }
+            : conv
+        );
+        const target = updated.find(conv => conv.id === activeConversationId);
+        if (!target) return updated;
+        return [target, ...updated.filter(conv => conv.id !== activeConversationId)];
+      });
+
       const assistantMessageResponse = await apiClient.createMessage({
-        conversation_id: newConversationId,
+        conversation_id: activeConversationId,
         content: '',
         type: 'assistant'
       });
       
-      if (assistantMessageResponse.success && assistantMessageResponse.data) {
-        const assistantMessage: Message = {
-          id: assistantMessageResponse.data.id,
-          content: '',
-          type: 'assistant',
-          timestamp: new Date(assistantMessageResponse.data.created_at),
-          isTyping: true
-        };
-        
-        // 添加空的助手消息到状态
-        setConversations(prev => prev.map(conv => 
-          conv.id === newConversationId 
+      if (!assistantMessageResponse.success || !assistantMessageResponse.data) {
+        throw new Error('Failed to create assistant message');
+      }
+
+      const assistantMessage: Message = {
+        id: assistantMessageResponse.data.id,
+        content: '',
+        type: 'assistant',
+        timestamp: new Date(assistantMessageResponse.data.created_at),
+        isTyping: true
+      };
+      
+      setConversations(prev => {
+        const updated = prev.map(conv =>
+          conv.id === activeConversationId
             ? { ...conv, messages: [...conv.messages, assistantMessage], lastUpdated: new Date() }
             : conv
-        ));
-        
-        // 设置流式响应状态
-        setStreamingMessageId(assistantMessageResponse.data.id);
-        
-        // 调用流式API生成实验
-        let hasStartedExperimentIdCheck = false;
-        let isFirstChunk = true;
-         await apiClient.generateExperimentStream(
-           {
-             prompt: messageContent,
-             conversation_id: newConversationId,
-             message_id: assistantMessageResponse.data.id,
-             model: selectedModel
-           },
-           (chunk: string) => {
-             // 收到第一个 chunk 时隐藏 "Searching & Generating" 状态
-             if (isFirstChunk) {
-               setIsSearchingGenerating(false);
-               isFirstChunk = false;
-             }
-             
-             // 实时更新消息内容
-             setConversations(prev => prev.map(conv => 
-               conv.id === newConversationId 
-                 ? {
-                     ...conv,
-                     messages: conv.messages.map(msg => 
-                       msg.id === assistantMessageResponse.data.id 
-                         ? { ...msg, content: msg.content + chunk }
-                         : msg
-                     )
-                   }
-                 : conv
-             ));
-             
-             // 当检测到HTML代码块开始时，开始检查experiment_id
-             if (!hasStartedExperimentIdCheck && chunk.includes('```html')) {
-               hasStartedExperimentIdCheck = true;
-               console.log('🔧 检测到HTML代码块，开始检查experiment_id');
-               
-               // 延迟一点时间让后端有机会设置experiment_id
-               setTimeout(() => {
-                 const checkExperimentIdDuringStream = async (attempt = 1, maxAttempts = 5) => {
-                   try {
-                     console.log(`流式响应中检查experiment_id，第${attempt}次尝试`);
-                     const messagesResponse = await apiClient.getMessages(newConversationId);
-                     if (messagesResponse.success && messagesResponse.data) {
-                       const updatedMessage = messagesResponse.data.find(msg => msg.id === assistantMessageResponse.data.id);
-                       if (updatedMessage?.experiment_id) {
-                         console.log('✅ 流式响应中获取到experiment_id:', updatedMessage.experiment_id);
-                         setConversations(prev => prev.map(conv => 
-                           conv.id === newConversationId 
-                             ? {
-                                 ...conv,
-                                 messages: conv.messages.map(msg => 
-                                   msg.id === assistantMessageResponse.data.id 
-                                     ? { ...msg, experiment_id: updatedMessage.experiment_id }
-                                     : msg
-                                 )
-                               }
-                             : conv
-                         ));
-                         return; // 成功获取，停止重试
-                       }
-                     }
-                     
-                     // 继续重试
-                     if (attempt < maxAttempts) {
-                       setTimeout(() => checkExperimentIdDuringStream(attempt + 1, maxAttempts), 2000);
-                     }
-                   } catch (error) {
-                     console.error('流式响应中获取experiment_id失败:', error);
-                     if (attempt < maxAttempts) {
-                       setTimeout(() => checkExperimentIdDuringStream(attempt + 1, maxAttempts), 2000);
-                     }
-                   }
-                 };
-                 
-                 checkExperimentIdDuringStream();
-               }, 1000);
-             }
-           }
-         );
-         
-         // 流式响应完成，更新状态
-         setConversations(prev => prev.map(conv => 
-           conv.id === newConversationId 
-             ? {
-                 ...conv,
-                 messages: conv.messages.map(msg => 
-                   msg.id === assistantMessageResponse.data.id 
-                     ? { ...msg, isTyping: false }
-                     : msg
-                 )
-               }
-             : conv
-         ));
-         
-         // 清除流式响应状态
-         setStreamingMessageId(null);
-         
-         // 立即检查一次experiment_id，然后定期检查直到获取到为止
-         const checkExperimentId = async (attempt = 1, maxAttempts = 10) => {
-           try {
-             console.log(`检查experiment_id，第${attempt}次尝试`);
-             const messagesResponse = await apiClient.getMessages(newConversationId);
-             if (messagesResponse.success && messagesResponse.data) {
-               const updatedMessage = messagesResponse.data.find(msg => msg.id === assistantMessageResponse.data.id);
-               if (updatedMessage?.experiment_id) {
-                 console.log('✅ 获取到experiment_id:', updatedMessage.experiment_id);
-                 setConversations(prev => prev.map(conv => 
-                   conv.id === newConversationId 
-                     ? {
-                         ...conv,
-                         messages: conv.messages.map(msg => 
-                           msg.id === assistantMessageResponse.data.id 
-                             ? { ...msg, experiment_id: updatedMessage.experiment_id }
-                             : msg
-                         )
-                       }
-                     : conv
-                 ));
-                 return; // 成功获取，停止重试
-               }
-             }
-             
-             // 如果还没有获取到experiment_id且还有重试次数，继续尝试
-             if (attempt < maxAttempts) {
-               setTimeout(() => checkExperimentId(attempt + 1, maxAttempts), 1000);
-             } else {
-               console.warn('⚠️ 达到最大重试次数，仍未获取到experiment_id');
-             }
-           } catch (error) {
-             console.error('获取experiment_id失败:', error);
-             // 即使出错也继续重试
-             if (attempt < maxAttempts) {
-               setTimeout(() => checkExperimentId(attempt + 1, maxAttempts), 1000);
-             }
-           }
-         };
-         
-         // 立即开始检查
-         checkExperimentId();
-         
-         // 滚动到底部
-         setTimeout(() => {
-           scrollToBottom();
-         }, 100);
+        );
+        const target = updated.find(conv => conv.id === activeConversationId);
+        if (!target) return updated;
+        return [target, ...updated.filter(conv => conv.id !== activeConversationId)];
+      });
+
+      setStreamingMessageId(assistantMessage.id);
+
+      let hasStartedExperimentIdCheck = false;
+      let isFirstChunk = true;
+
+      await apiClient.generateExperimentStream(
+        {
+          prompt: messageContent,
+          conversation_id: activeConversationId,
+          message_id: assistantMessage.id,
+          model: selectedModel
+        },
+        (chunk: string) => {
+          if (isFirstChunk) {
+            setIsSearchingGenerating(false);
+            isFirstChunk = false;
+          }
+
+          setConversations(prev => {
+            const updated = prev.map(conv =>
+              conv.id === activeConversationId
+                ? {
+                    ...conv,
+                    messages: conv.messages.map(msg =>
+                      msg.id === assistantMessage.id
+                        ? { ...msg, content: msg.content + chunk }
+                        : msg
+                    )
+                  }
+                : conv
+            );
+            const target = updated.find(conv => conv.id === activeConversationId);
+            if (!target) return updated;
+            return [target, ...updated.filter(conv => conv.id !== activeConversationId)];
+          });
+
+          if (!hasStartedExperimentIdCheck && chunk.includes('```html')) {
+            hasStartedExperimentIdCheck = true;
+            console.log('🔧 检测到HTML代码块，开始检查experiment_id');
+
+            setTimeout(() => {
+              const checkExperimentIdDuringStream = async (attempt = 1, maxAttempts = 5) => {
+                try {
+                  console.log(`流式响应中检查experiment_id，第${attempt}次尝试`);
+                  const messagesResponse = await apiClient.getMessages(activeConversationId);
+                  if (messagesResponse.success && messagesResponse.data) {
+                    const updatedMessage = messagesResponse.data.find(msg => msg.id === assistantMessage.id);
+                    if (updatedMessage?.experiment_id) {
+                      console.log('✅ 流式响应中获取到experiment_id:', updatedMessage.experiment_id);
+                      setConversations(prev => {
+                        const updated = prev.map(conv =>
+                          conv.id === activeConversationId
+                            ? {
+                                ...conv,
+                                messages: conv.messages.map(msg =>
+                                  msg.id === assistantMessage.id
+                                    ? { ...msg, experiment_id: updatedMessage.experiment_id }
+                                    : msg
+                                )
+                              }
+                            : conv
+                        );
+                        const target = updated.find(conv => conv.id === activeConversationId);
+                        if (!target) return updated;
+                        return [target, ...updated.filter(conv => conv.id !== activeConversationId)];
+                      });
+                      return;
+                    }
+                  }
+
+                  if (attempt < maxAttempts) {
+                    setTimeout(() => checkExperimentIdDuringStream(attempt + 1, maxAttempts), 2000);
+                  }
+                } catch (streamError) {
+                  console.error('流式响应中获取experiment_id失败:', streamError);
+                  if (attempt < maxAttempts) {
+                    setTimeout(() => checkExperimentIdDuringStream(attempt + 1, maxAttempts), 2000);
+                  }
+                }
+              };
+
+              checkExperimentIdDuringStream();
+            }, 1000);
+          }
+        }
+      );
+
+      setConversations(prev => {
+        const updated = prev.map(conv =>
+          conv.id === activeConversationId
+            ? {
+                ...conv,
+                messages: conv.messages.map(msg =>
+                  msg.id === assistantMessage.id
+                    ? { ...msg, isTyping: false }
+                    : msg
+                )
+              }
+            : conv
+        );
+        const target = updated.find(conv => conv.id === activeConversationId);
+        if (!target) return updated;
+        return [target, ...updated.filter(conv => conv.id !== activeConversationId)];
+      });
+
+      setStreamingMessageId(null);
+
+      if (hasStartedExperimentIdCheck) {
+        const checkExperimentId = async (attempt = 1, maxAttempts = 10) => {
+          try {
+            console.log(`检查experiment_id，第${attempt}次尝试`);
+            const messagesResponse = await apiClient.getMessages(activeConversationId);
+            if (messagesResponse.success && messagesResponse.data) {
+              const updatedMessage = messagesResponse.data.find(msg => msg.id === assistantMessage.id);
+              if (updatedMessage?.experiment_id) {
+                console.log('✅ 获取到experiment_id:', updatedMessage.experiment_id);
+                setConversations(prev => {
+                  const updated = prev.map(conv =>
+                    conv.id === activeConversationId
+                      ? {
+                          ...conv,
+                          messages: conv.messages.map(msg =>
+                            msg.id === assistantMessage.id
+                              ? { ...msg, experiment_id: updatedMessage.experiment_id }
+                              : msg
+                          )
+                        }
+                      : conv
+                  );
+                  const target = updated.find(conv => conv.id === activeConversationId);
+                  if (!target) return updated;
+                  return [target, ...updated.filter(conv => conv.id !== activeConversationId)];
+                });
+                return;
+              }
+            }
+
+            if (attempt < maxAttempts) {
+              setTimeout(() => checkExperimentId(attempt + 1, maxAttempts), 1000);
+            } else {
+              console.warn('⚠️ 达到最大重试次数，仍未获取到experiment_id');
+            }
+          } catch (error) {
+            console.error('获取experiment_id失败:', error);
+            if (attempt < maxAttempts) {
+              setTimeout(() => checkExperimentId(attempt + 1, maxAttempts), 1000);
+            }
+          }
+        };
+
+        checkExperimentId();
       }
+
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
     } catch (error) {
       console.error('生成实验失败:', error);
-      const errorContent = `Sorry, an error occurred while generating the experiment: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again later.`;
+      const errorContent = `Sorry, an error occurred while generating the response: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again later.`;
       
-      // 保存错误消息到数据库（仅在成功创建对话后）
-      if (newConversationId) {
-        const errorMessageResponse = await apiClient.createMessage({
-          conversation_id: newConversationId,
-          content: errorContent,
-          type: 'assistant'
-        });
-        
-        if (errorMessageResponse.success && errorMessageResponse.data) {
-          const errorMessage: Message = {
-            id: errorMessageResponse.data.id,
-            content: errorMessageResponse.data.content,
-            type: 'assistant',
-            timestamp: new Date(errorMessageResponse.data.created_at)
-          };
+      if (activeConversationId) {
+        try {
+          const errorMessageResponse = await apiClient.createMessage({
+            conversation_id: activeConversationId,
+            content: errorContent,
+            type: 'assistant'
+          });
           
-          setConversations(prev => prev.map(conv => 
-            conv.id === newConversationId 
-              ? { ...conv, messages: [...conv.messages, errorMessage], lastUpdated: new Date() }
-              : conv
-          ));
+          if (errorMessageResponse.success && errorMessageResponse.data) {
+            const errorMessage: Message = {
+              id: errorMessageResponse.data.id,
+              content: errorMessageResponse.data.content,
+              type: 'assistant',
+              timestamp: new Date(errorMessageResponse.data.created_at)
+            };
+            
+            setConversations(prev => {
+              const updated = prev.map(conv =>
+                conv.id === activeConversationId
+                  ? { ...conv, messages: [...conv.messages, errorMessage], lastUpdated: new Date() }
+                  : conv
+              );
+              const target = updated.find(conv => conv.id === activeConversationId);
+              if (!target) return updated;
+              return [target, ...updated.filter(conv => conv.id !== activeConversationId)];
+            });
+          }
+        } catch (persistError) {
+          console.error('Failed to persist error message:', persistError);
         }
       }
     } finally {
@@ -657,52 +734,80 @@ function Home() {
               )}
               {conversations
                 .find(c => c.id === currentConversation)
-                ?.messages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
+                ?.messages.map((message, index) => {
+                  const isAssistant = message.type === 'assistant';
+                  const isStreamingAssistant =
+                    isAssistant && streamingMessageId === message.id;
+                  const showSearchState =
+                    isSearchingGenerating && isStreamingAssistant && !message.content;
+
+                  return (
                     <div
-                      className={`max-w-[80%] p-4 rounded-low ${
-                        message.type === 'user'
-                          ? 'bg-primary text-white'
-                          : 'bg-dark-bg-secondary text-dark-text border border-dark-border'
-                      }`}
+                      key={index}
+                      className={`flex ${isAssistant ? 'justify-start' : 'justify-end'}`}
                     >
-                      <div className="whitespace-pre-wrap">
-                        {/* 显示 "Searching & Generating" 状态 */}
-                        {isSearchingGenerating && message.type === 'assistant' && streamingMessageId === message.id && !message.content ? (
-                          <div className="flex items-center gap-2 text-dark-text-secondary">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                            <span>Searching & Generating...</span>
+                      <div
+                        className={`max-w-[80%] p-4 rounded-low ${
+                          isAssistant
+                            ? 'bg-dark-bg-secondary text-dark-text border border-dark-border'
+                            : 'bg-primary text-white'
+                        }`}
+                      >
+                        <div className={isAssistant ? '' : 'whitespace-pre-wrap'}>
+                          {showSearchState ? (
+                            <div className="flex items-center gap-2 text-dark-text-secondary">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                              <span>Searching & Generating...</span>
+                            </div>
+                          ) : isAssistant ? (
+                            <>
+                              {isStreamingAssistant ? (
+                                <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                                  {message.content}
+                                  <span className="inline-block w-2 h-5 bg-primary animate-pulse"></span>
+                                </div>
+                              ) : (
+                                <div className="markdown-content">
+                                  <ReactMarkdown
+                                    key={`${message.id}-${message.content.length}`}
+                                    remarkPlugins={markdownRemarkPlugins}
+                                    rehypePlugins={markdownRehypePlugins}
+                                    components={markdownComponents}
+                                  >
+                                    {message.content || ''}
+                                  </ReactMarkdown>
+                                  {message.isTyping && (
+                                    <span className="inline-block w-2 h-5 bg-primary animate-pulse"></span>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {message.content}
+                              {(message.isTyping || streamingMessageId === message.id) && message.content && (
+                                <span className="inline-block w-2 h-5 bg-primary ml-1 animate-pulse"></span>
+                              )}
+                            </>
+                          )}
+                        </div>
+
+                        {/* 如果消息有实验ID且不在流式响应中，显示查看演示按钮 */}
+                        {message.experiment_id && streamingMessageId !== message.id && (
+                          <div className="mt-4 pt-3 border-t border-dark-border">
+                            <button
+                              onClick={() => navigate(`/demo/${message.experiment_id}`)}
+                              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-low transition-colors"
+                            >
+                              <Play className="w-4 h-4" />
+                              View Interactive Demo
+                            </button>
                           </div>
-                        ) : (
-                          <>
-                            {message.content}
-                            {(message.isTyping || streamingMessageId === message.id) && message.content && (
-                              <span className="inline-block w-2 h-5 bg-primary ml-1 animate-pulse"></span>
-                            )}
-                          </>
                         )}
                       </div>
-                      
-                      {/* 如果消息有实验ID且不在流式响应中，显示查看演示按钮 */}
-                      {message.experiment_id && streamingMessageId !== message.id && (
-                        <div className="mt-4 pt-3 border-t border-dark-border">
-                          <button
-                            onClick={() => navigate(`/demo/${message.experiment_id}`)}
-                            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-low transition-colors"
-                          >
-                            <Play className="w-4 h-4" />
-                            View Interactive Demo
-                          </button>
-                        </div>
-                      )}
-                      
-
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               <div ref={messagesEndRef} />
             </div>
           ) : isLoading ? (

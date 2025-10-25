@@ -180,9 +180,20 @@ class ApiClient {
             if (line.trim() && line.startsWith('data: ')) {
               const data = line.slice(6);
               if (data !== '[DONE]') {
-                chunkCount++;
-                console.log(`📦 Received chunk ${chunkCount}:`, data.substring(0, 50) + '...');
-                onChunk(data);
+                try {
+                  const parsed = JSON.parse(data) as { content?: string };
+                  if (typeof parsed?.content === 'string') {
+                    chunkCount++;
+                    console.log(`📦 Received chunk ${chunkCount}:`, parsed.content.substring(0, 50) + '...');
+                    onChunk(parsed.content);
+                  } else {
+                    console.warn('⚠️ Received chunk without string content field:', data);
+                  }
+                } catch (parseError) {
+                  console.error('❌ Failed to parse streaming chunk:', parseError, data);
+                  chunkCount++;
+                  onChunk(data);
+                }
               }
             }
           }

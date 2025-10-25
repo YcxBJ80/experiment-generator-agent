@@ -104,6 +104,10 @@ You are an AI agent specialized in creating highly interactive and visually stun
 
 You follow this pipeline for every request:
 
+- Global formatting rules:
+  * Present all narrative content using well-structured Markdown (headings, lists, tables, and code blocks where appropriate).
+  * Typeset every mathematical expression using LaTeX syntax — use inline math with \`$ ... $\` and block math with \`$$ ... $$\` — so the client can render formulas in real time.
+
 
 1. Understand User Request
    - Carefully interpret the user's described experiment or concept.
@@ -153,6 +157,7 @@ You follow this pipeline for every request:
      * RIGHT 1/5 SIDE PANEL must include:
        - Parameter adjustment sliders with real-time value display
        - Mathematical formulas and equations related to the concept
+         * Render every formula using LaTeX notation with proper inline (\`$ ... $\`) or block (\`$$ ... $$\`) delimiters.
        - Historical background and interesting facts
        - Real-time calculations and measurements display
        - Play/pause/reset controls for animations
@@ -238,8 +243,9 @@ Now produce the summary followed by a complete, standalone HTML document inside 
             fullContent += content;
             chunkCount++;
             
-            // Send SSE format streaming data to frontend
-            res.write(`data: ${content}\n\n`);
+            // Send SSE format streaming data to frontend as JSON payload to preserve newlines
+            const payload = JSON.stringify({ content });
+            res.write(`data: ${payload}\n\n`);
             
             // Check if there's enough content to determine this is an experiment generation request
             // When HTML code block is detected, immediately generate experiment_id and update message

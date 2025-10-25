@@ -31,7 +31,7 @@ export class CodeLinter {
   static lintCode(htmlContent: string, cssContent: string, jsContent: string): LinterResult {
     const htmlResult = this.validateHTML(htmlContent);
     const cssResult = this.validateCSS(cssContent);
-    const jsResult = this.validateSyntax(jsContent);
+    const jsResult = JavaScriptValidator.validateSyntax(jsContent);
     
     const totalErrors = htmlResult.errors.length + cssResult.errors.length + jsResult.errors.length;
     
