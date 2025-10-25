@@ -400,6 +400,14 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
     let chatHistory: ChatHistoryMessage[] = [];
     let experimentId: string | null = null;
 
+    const sendSSEEvent = (payload: string) => {
+      const lines = payload.split(/\r?\n/);
+      for (const line of lines) {
+        res.write(`data: ${line}\n`);
+      }
+      res.write('\n');
+    };
+
     if (conversation_id) {
       try {
         const conversationMessages = await DatabaseService.getMessages(conversation_id);
@@ -417,8 +425,8 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
     if (mode === 'experiment') {
       if (!message_id) {
         console.error('❌ Missing message_id, cannot assign experiment_id before streaming');
-        res.write(`data: Failed to prepare experiment response: missing message identifier.\n\n`);
-        res.write('data: [DONE]\n\n');
+        sendSSEEvent('Failed to prepare experiment response: missing message identifier.');
+        sendSSEEvent('[DONE]');
         res.end();
         return;
       }
@@ -436,8 +444,8 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
         console.log('✅ Experiment ID generated before streaming:', experimentId);
       } catch (idError) {
         console.error('❌ Failed to generate or persist experiment_id:', idError);
-        res.write(`data: Failed to prepare experiment response. Please try again later.\n\n`);
-        res.write('data: [DONE]\n\n');
+        sendSSEEvent('Failed to prepare experiment response. Please try again later.');
+        sendSSEEvent('[DONE]');
         res.end();
         return;
       }
@@ -493,7 +501,7 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
             fullContent += content;
             chunkCount++;
             
-            res.write(`data: ${content}\n\n`);
+            sendSSEEvent(content);
 
             if (chunkCount % 10 === 0) {
               console.log(`📦 Sent ${chunkCount} chunks, current length: ${fullContent.length}`);
@@ -501,7 +509,7 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
           }
         }
         
-        res.write('data: [DONE]\n\n');
+        sendSSEEvent('[DONE]');
         res.end();
         
         console.log('✅ Streaming response completed, total chunks:', chunkCount, 'total length:', fullContent.length);
@@ -554,13 +562,13 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
         
       } catch (error) {
         console.error('OpenAI API call failed:', error);
-        res.write(`data: \n\n❌ Error occurred while generating response: ${error instanceof Error ? error.message : 'Unknown error'}\n\n`);
-        res.write('data: [DONE]\n\n');
+        sendSSEEvent(`❌ Error occurred while generating response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        sendSSEEvent('[DONE]');
         res.end();
       }
     } else {
-      res.write('data: \n\n❌ OpenAI client not initialized\n\n');
-      res.write('data: [DONE]\n\n');
+      sendSSEEvent('❌ OpenAI client not initialized');
+      sendSSEEvent('[DONE]');
       res.end();
     }
     

@@ -162,44 +162,85 @@ class ApiClient {
       const decoder = new TextDecoder();
       let buffer = '';
       let chunkCount = 0;
-      
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          
-          if (done) {
-            console.log('✅ Streaming data reading completed, total chunks:', chunkCount);
-            break;
+      const eventData: string[] = [];
+      let hasLoggedCompletion = false;
+
+      const flushEvent = (): boolean => {
+        if (!eventData.length) {
+          return false;
+        }
+        const text = eventData.join('\n');
+        eventData.length = 0;
+
+        if (text === '[DONE]') {
+          return true;
+        }
+
+        chunkCount++;
+        console.log(`📦 Received chunk ${chunkCount}:`, text.substring(0, 50) + '...');
+        onChunk(text);
+        return false;
+      };
+
+      const processLine = (rawLine: string): boolean => {
+        if (rawLine === '') {
+          return flushEvent();
+        }
+
+        if (rawLine.startsWith('data:')) {
+          let value = rawLine.slice(5);
+          if (value.startsWith(' ')) {
+            value = value.slice(1);
           }
-          
-          buffer += decoder.decode(value, { stream: true });
+          eventData.push(value);
+        }
+        return false;
+      };
+
+      try {
+        let shouldStop = false;
+
+        while (!shouldStop) {
+          const { done, value } = await reader.read();
+
+          if (value) {
+            buffer += decoder.decode(value, { stream: true });
+          }
+
           const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+          buffer = lines.pop() ?? '';
 
           for (const line of lines) {
-            if (line.trim() && line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data !== '[DONE]') {
-                try {
-                  const parsed = JSON.parse(data) as { content?: string };
-                  if (typeof parsed?.content === 'string') {
-                    chunkCount++;
-                    console.log(`📦 Received chunk ${chunkCount}:`, parsed.content.substring(0, 50) + '...');
-                    onChunk(parsed.content);
-                  } else {
-                    console.warn('⚠️ Received chunk without string content field:', data);
-                  }
-                } catch (parseError) {
-                  console.error('❌ Failed to parse streaming chunk:', parseError, data);
-                  chunkCount++;
-                  onChunk(data);
-                }
-              }
+            if (processLine(line)) {
+              shouldStop = true;
+              break;
             }
+          }
+
+          if (shouldStop) {
+            break;
+          }
+
+          if (done) {
+            if (buffer) {
+              if (processLine(buffer)) {
+                break;
+              }
+              buffer = '';
+            }
+            // Ensure any buffered event is delivered
+            processLine('');
+            console.log('✅ Streaming data reading completed, total chunks:', chunkCount);
+            hasLoggedCompletion = true;
+            break;
           }
         }
       } finally {
         reader.releaseLock();
+      }
+
+      if (!hasLoggedCompletion) {
+        console.log('✅ Streaming data reading completed, total chunks:', chunkCount);
       }
     } catch (error) {
       console.error('Streaming API request failed:', error);
