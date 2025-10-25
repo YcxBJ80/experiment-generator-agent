@@ -398,6 +398,7 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
     });
 
     let chatHistory: ChatHistoryMessage[] = [];
+    let experimentId: string | null = null;
 
     if (conversation_id) {
       try {
@@ -410,13 +411,41 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
     }
 
     const isFirstTurn = chatHistory.length <= 1;
-    console.log('Conversation history length:', chatHistory.length, 'isFirstTurn:', isFirstTurn);
+    const mode: 'experiment' | 'chat' = isFirstTurn ? 'experiment' : 'chat';
+    console.log('Conversation history length:', chatHistory.length, 'isFirstTurn:', isFirstTurn, 'mode:', mode);
+
+    if (mode === 'experiment') {
+      if (!message_id) {
+        console.error('❌ Missing message_id, cannot assign experiment_id before streaming');
+        res.write(`data: Failed to prepare experiment response: missing message identifier.\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      }
+
+      try {
+        experimentId = randomUUID();
+        const updated = await DatabaseService.updateMessage(message_id, {
+          experiment_id: experimentId
+        });
+
+        if (!updated) {
+          throw new Error('Database update returned null');
+        }
+
+        console.log('✅ Experiment ID generated before streaming:', experimentId);
+      } catch (idError) {
+        console.error('❌ Failed to generate or persist experiment_id:', idError);
+        res.write(`data: Failed to prepare experiment response. Please try again later.\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      }
+    }
 
     console.log('Getting Perplexity knowledge...');
     const perplexityKnowledge = await perplexityMCPClient.getExperimentKnowledge(prompt);
     console.log('Perplexity knowledge retrieval completed');
-
-    const mode: 'experiment' | 'chat' = isFirstTurn ? 'experiment' : 'chat';
     console.log(`🧭 Conversation mode for this request: ${mode}`);
 
     const systemPrompt = mode === 'experiment'
@@ -458,9 +487,6 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
 
         let fullContent = '';
         let chunkCount = 0;
-        let experimentId: string | null = null;
-        let hasUpdatedExperimentId = false;
-        
         for await (const chunk of stream) {
           const content = chunk.choices?.[0]?.delta?.content;
           if (content) {
@@ -468,22 +494,6 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
             chunkCount++;
             
             res.write(`data: ${content}\n\n`);
-            
-            if (mode === 'experiment' && message_id && !hasUpdatedExperimentId && fullContent.includes('```html')) {
-              try {
-                experimentId = randomUUID();
-                console.log('🔧 HTML code block detected, setting experiment_id immediately:', experimentId);
-                
-                await DatabaseService.updateMessage(message_id, {
-                  experiment_id: experimentId
-                });
-                
-                hasUpdatedExperimentId = true;
-                console.log('✅ experiment_id stored early for streaming message');
-              } catch (updateError) {
-                console.error('❌ Failed to set experiment_id during stream:', updateError);
-              }
-            }
 
             if (chunkCount % 10 === 0) {
               console.log(`📦 Sent ${chunkCount} chunks, current length: ${fullContent.length}`);
@@ -504,7 +514,10 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
               const htmlMatch = fullContent.match(/```html\s*([\s\S]*?)\s*```/);
               if (htmlMatch) {
                 const htmlContent = htmlMatch[1].trim();
-                const resolvedExperimentId = experimentId || randomUUID();
+                const resolvedExperimentId = experimentId ?? randomUUID();
+                if (!experimentId) {
+                  console.warn('⚠️ Experiment ID was not set before streaming; generated fallback ID:', resolvedExperimentId);
+                }
                 
                 const titleMatch = htmlContent.match(/<title>(.*?)<\/title>/i);
                 const title = titleMatch ? titleMatch[1] : 'Experiment Demo';
@@ -576,6 +589,17 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
       return res.status(400).json({
         success: false,
         error: 'Please provide experiment requirement description'
+      });
+    }
+
+    let experiment_id: string;
+    try {
+      experiment_id = randomUUID();
+    } catch (idError) {
+      console.error('❌ Failed to generate experiment_id for non-stream request:', idError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to prepare experiment identifier'
       });
     }
 
@@ -940,9 +964,6 @@ Now produce the summary followed by a complete, standalone HTML document inside 
         error: 'OpenAI API call failed, unable to generate experiment. Please check API configuration or try again later.'
       });
     }
-
-    // 生成实验ID
-    const experiment_id = randomUUID();
 
     const response: GenerateExperimentResponse = {
       experiment_id,

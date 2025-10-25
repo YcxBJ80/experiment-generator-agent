@@ -437,7 +437,104 @@ function Home() {
       setStreamingMessageId(assistantMessage.id);
 
       let hasStartedExperimentIdCheck = false;
+      let hasResolvedExperimentId = false;
       let isFirstChunk = true;
+      const expectExperimentResponse = !hadMessagesBeforeSend;
+      if (!expectExperimentResponse) {
+        hasResolvedExperimentId = true;
+      }
+
+      const applyExperimentIdToAssistantMessage = (experimentId: string) => {
+        hasResolvedExperimentId = true;
+        setConversations(prev => {
+          const updated = prev.map(conv =>
+            conv.id === activeConversationId
+              ? {
+                  ...conv,
+                  messages: conv.messages.map(msg =>
+                    msg.id === assistantMessage.id
+                      ? { ...msg, experiment_id: experimentId }
+                      : msg
+                  )
+                }
+              : conv
+          );
+          const target = updated.find(conv => conv.id === activeConversationId);
+          if (!target) return updated;
+          return [target, ...updated.filter(conv => conv.id !== activeConversationId)];
+        });
+      };
+
+      const fetchLatestExperimentId = async (): Promise<string | null> => {
+        const messagesResponse = await apiClient.getMessages(activeConversationId);
+        if (messagesResponse.success && messagesResponse.data) {
+          const updatedMessage = messagesResponse.data.find(msg => msg.id === assistantMessage.id);
+          if (updatedMessage?.experiment_id) {
+            return updatedMessage.experiment_id;
+          }
+        }
+        return null;
+      };
+
+      const pollExperimentIdDuringStream = async (attempt = 1, maxAttempts = 5): Promise<void> => {
+        if (hasResolvedExperimentId) return;
+        try {
+          console.log(`流式响应中检查experiment_id，第${attempt}次尝试`);
+          const latestExperimentId = await fetchLatestExperimentId();
+          if (latestExperimentId) {
+            console.log('✅ 流式响应中获取到experiment_id:', latestExperimentId);
+            applyExperimentIdToAssistantMessage(latestExperimentId);
+            return;
+          }
+        } catch (streamError) {
+          console.error('流式响应中获取experiment_id失败:', streamError);
+        }
+
+        if (!hasResolvedExperimentId && attempt < maxAttempts) {
+          setTimeout(() => {
+            void pollExperimentIdDuringStream(attempt + 1, maxAttempts);
+          }, 2000);
+        }
+      };
+
+      const pollExperimentIdAfterStream = async (attempt = 1, maxAttempts = 10): Promise<void> => {
+        if (hasResolvedExperimentId) return;
+        try {
+          console.log(`检查experiment_id，第${attempt}次尝试`);
+          const latestExperimentId = await fetchLatestExperimentId();
+          if (latestExperimentId) {
+            console.log('✅ 获取到experiment_id:', latestExperimentId);
+            applyExperimentIdToAssistantMessage(latestExperimentId);
+            return;
+          }
+        } catch (error) {
+          console.error('获取experiment_id失败:', error);
+        }
+
+        if (!hasResolvedExperimentId && attempt < maxAttempts) {
+          setTimeout(() => {
+            void pollExperimentIdAfterStream(attempt + 1, maxAttempts);
+          }, 1000);
+        } else if (!hasResolvedExperimentId) {
+          console.warn('⚠️ 达到最大重试次数，仍未获取到experiment_id');
+        }
+      };
+
+      const startExperimentIdPolling = () => {
+        if (!expectExperimentResponse) {
+          return;
+        }
+        if (hasStartedExperimentIdCheck || hasResolvedExperimentId) {
+          return;
+        }
+        hasStartedExperimentIdCheck = true;
+        console.log('🔧 收到用户输入后立即开始检查experiment_id');
+        setTimeout(() => {
+          void pollExperimentIdDuringStream();
+        }, 1000);
+      };
+
+      startExperimentIdPolling();
 
       await apiClient.generateExperimentStream(
         {
@@ -470,54 +567,7 @@ function Home() {
             return [target, ...updated.filter(conv => conv.id !== activeConversationId)];
           });
 
-          if (!hasStartedExperimentIdCheck && chunk.includes('```html')) {
-            hasStartedExperimentIdCheck = true;
-            console.log('🔧 检测到HTML代码块，开始检查experiment_id');
-
-            setTimeout(() => {
-              const checkExperimentIdDuringStream = async (attempt = 1, maxAttempts = 5) => {
-                try {
-                  console.log(`流式响应中检查experiment_id，第${attempt}次尝试`);
-                  const messagesResponse = await apiClient.getMessages(activeConversationId);
-                  if (messagesResponse.success && messagesResponse.data) {
-                    const updatedMessage = messagesResponse.data.find(msg => msg.id === assistantMessage.id);
-                    if (updatedMessage?.experiment_id) {
-                      console.log('✅ 流式响应中获取到experiment_id:', updatedMessage.experiment_id);
-                      setConversations(prev => {
-                        const updated = prev.map(conv =>
-                          conv.id === activeConversationId
-                            ? {
-                                ...conv,
-                                messages: conv.messages.map(msg =>
-                                  msg.id === assistantMessage.id
-                                    ? { ...msg, experiment_id: updatedMessage.experiment_id }
-                                    : msg
-                                )
-                              }
-                            : conv
-                        );
-                        const target = updated.find(conv => conv.id === activeConversationId);
-                        if (!target) return updated;
-                        return [target, ...updated.filter(conv => conv.id !== activeConversationId)];
-                      });
-                      return;
-                    }
-                  }
-
-                  if (attempt < maxAttempts) {
-                    setTimeout(() => checkExperimentIdDuringStream(attempt + 1, maxAttempts), 2000);
-                  }
-                } catch (streamError) {
-                  console.error('流式响应中获取experiment_id失败:', streamError);
-                  if (attempt < maxAttempts) {
-                    setTimeout(() => checkExperimentIdDuringStream(attempt + 1, maxAttempts), 2000);
-                  }
-                }
-              };
-
-              checkExperimentIdDuringStream();
-            }, 1000);
-          }
+          startExperimentIdPolling();
         }
       );
 
@@ -541,50 +591,8 @@ function Home() {
 
       setStreamingMessageId(null);
 
-      if (hasStartedExperimentIdCheck) {
-        const checkExperimentId = async (attempt = 1, maxAttempts = 10) => {
-          try {
-            console.log(`检查experiment_id，第${attempt}次尝试`);
-            const messagesResponse = await apiClient.getMessages(activeConversationId);
-            if (messagesResponse.success && messagesResponse.data) {
-              const updatedMessage = messagesResponse.data.find(msg => msg.id === assistantMessage.id);
-              if (updatedMessage?.experiment_id) {
-                console.log('✅ 获取到experiment_id:', updatedMessage.experiment_id);
-                setConversations(prev => {
-                  const updated = prev.map(conv =>
-                    conv.id === activeConversationId
-                      ? {
-                          ...conv,
-                          messages: conv.messages.map(msg =>
-                            msg.id === assistantMessage.id
-                              ? { ...msg, experiment_id: updatedMessage.experiment_id }
-                              : msg
-                          )
-                        }
-                      : conv
-                  );
-                  const target = updated.find(conv => conv.id === activeConversationId);
-                  if (!target) return updated;
-                  return [target, ...updated.filter(conv => conv.id !== activeConversationId)];
-                });
-                return;
-              }
-            }
-
-            if (attempt < maxAttempts) {
-              setTimeout(() => checkExperimentId(attempt + 1, maxAttempts), 1000);
-            } else {
-              console.warn('⚠️ 达到最大重试次数，仍未获取到experiment_id');
-            }
-          } catch (error) {
-            console.error('获取experiment_id失败:', error);
-            if (attempt < maxAttempts) {
-              setTimeout(() => checkExperimentId(attempt + 1, maxAttempts), 1000);
-            }
-          }
-        };
-
-        checkExperimentId();
+      if (hasStartedExperimentIdCheck && !hasResolvedExperimentId) {
+        void pollExperimentIdAfterStream();
       }
 
       setTimeout(() => {
