@@ -249,6 +249,7 @@ You follow this pipeline for every request:
       - Real-time calculations and measurements display
       - Play/pause/reset controls for animations
       - Speed control for animations
+      - Dedicated particle system controls, including a toggle that cleanly turns all particle effects on or off with instant visual feedback
       - Different viewing modes or simulation presets
      * LEFT SIDE DEMO must include:
        - Main visualization area with smooth animations
