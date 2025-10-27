@@ -6,8 +6,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { perplexityMCPClient } from '../lib/perplexityMcpClient.js';
-
 import { DatabaseService } from '../lib/supabase.js';
+import { requireAuth, type AuthenticatedRequest } from '../middleware/auth.js';
 
 // Ensure environment variables are loaded
 const __filename = fileURLToPath(import.meta.url);
@@ -388,9 +388,17 @@ router.get('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
 /**
  * Submit survey for experiment
  */
-router.post('/survey', async (req: ExpressRequest, res: ExpressResponse) => {
+router.post('/survey', requireAuth, async (req: AuthenticatedRequest, res: ExpressResponse) => {
   try {
     const { experiment_id, reflects_real_world, visualization_rating, concept_understanding, suggestions } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
     
     console.log(`📝 Submitting survey for experiment: ${experiment_id}`);
     
@@ -418,7 +426,8 @@ router.post('/survey', async (req: ExpressRequest, res: ExpressResponse) => {
       reflects_real_world,
       visualization_rating: parseInt(visualization_rating),
       concept_understanding: parseInt(concept_understanding),
-      suggestions: suggestions || ''
+      suggestions: suggestions || '',
+      user_id: userId
     };
     
     const survey = await DatabaseService.createSurvey(surveyData);

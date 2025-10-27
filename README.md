@@ -118,26 +118,13 @@ SUPABASE_ANON_KEY=your_supabase_anon_key_here
 
 4. **Database setup**
 
-Run the following SQL scripts in your Supabase console:
+Use the Supabase CLI to apply the migrations shipped with this repository:
 
-```sql
--- Create conversations table
-CREATE TABLE conversations (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  title TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create messages table
-CREATE TABLE messages (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
-  content TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
-  experiment_id UUID,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+```bash
+supabase db push
 ```
+
+This command creates all required tables (including `messages`, `surveys`, and `user_profiles`), indexes, and triggers. If you already ran an earlier migration that removed `user_profiles`, ensure you apply the latest migrations so the table is restored.
 
 5. **Start development servers**
 ```bash

@@ -97,7 +97,7 @@ export default function Demo() {
   }, [experiment]);
 
   const handleGoBack = () => {
-    navigate('/', { state: { showSurvey: true, experimentId: id } });
+    navigate('/app', { state: { showSurvey: true, experimentId: id } });
   };
 
   if (loading) {

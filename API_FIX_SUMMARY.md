@@ -55,6 +55,7 @@ NODE_ENV=development
 1. 请勿将 `.env` 文件提交到版本控制系统。
 2. 如果使用Vercel部署，请在Vercel控制台中配置环境变量。
 3. OpenRouter API密钥可以从 [OpenRouter官网](https://openrouter.ai/keys) 获取。
+4. 运行 `supabase db push` 以应用最新的数据库迁移（其中 `supabase/migrations/20251028000000_ensure_user_profiles_table.sql` 会确保存在 `user_profiles` 表）。
 
 ## 后续建议
 

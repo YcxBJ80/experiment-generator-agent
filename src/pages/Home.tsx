@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, Send, Play, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { apiClient, type ExperimentData, type Conversation as ApiConversation, type Message as ApiMessage } from '@/lib/api';
+import { useAuth, useAuthActions } from '@/hooks/useAuth';
 import LightRays from '../components/LightRays';
 import DonationButton from '../components/DonationButton';
 import SurveyModal from '../components/SurveyModal';
@@ -39,6 +40,8 @@ interface Conversation {
 function Home() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  const { clearAuth } = useAuthActions();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<string>('');
   const [inputMessage, setInputMessage] = useState('');
@@ -58,6 +61,22 @@ function Home() {
   // 问卷相关状态
   const [showSurveyModal, setShowSurveyModal] = useState(false);
   const [surveyExperimentId, setSurveyExperimentId] = useState<string>('');
+
+  const handleUnauthorized = () => {
+    clearAuth();
+    navigate('/login', { replace: true });
+  };
+
+  const handleLogout = async () => {
+    try {
+      await apiClient.logout();
+    } catch (error) {
+      console.warn('Logout request failed:', error);
+    } finally {
+      clearAuth();
+      navigate('/', { replace: true });
+    }
+  };
 
   const markdownRemarkPlugins = useMemo(() => [remarkGfm, remarkMath, remarkBreaks], []);
   const markdownRehypePlugins = useMemo(() => [rehypeRaw, rehypeKatex], []);
@@ -116,24 +135,31 @@ function Home() {
     try {
       setIsLoading(true);
       const response = await apiClient.getConversations();
-      
-      if (response.success && response.data) {
-        // 只加载对话列表，不加载消息
-        const conversationsWithoutMessages = response.data.map((conv: ApiConversation) => ({
-          id: conv.id,
-          title: conv.title,
-          messages: [] as Message[], // 初始为空，按需加载
-          lastUpdated: new Date(conv.updated_at)
-        }));
-        
-        setConversations(conversationsWithoutMessages);
-        
-        // 如果有对话，选择第一个但不自动加载消息
-        if (conversationsWithoutMessages.length > 0) {
-          const firstConvId = conversationsWithoutMessages[0].id;
-          setCurrentConversation(firstConvId);
-          // 移除自动加载消息，让用户手动点击对话来加载
+
+      if (!response.success || !response.data) {
+        if (response.status === 401) {
+          handleUnauthorized();
+        } else {
+          console.error('加载对话历史失败:', response.error);
         }
+        return;
+      }
+
+      // 只加载对话列表，不加载消息
+      const conversationsWithoutMessages = response.data.map((conv: ApiConversation) => ({
+        id: conv.id,
+        title: conv.title,
+        messages: [] as Message[], // 初始为空，按需加载
+        lastUpdated: new Date(conv.updated_at)
+      }));
+
+      setConversations(conversationsWithoutMessages);
+
+      // 如果有对话，选择第一个但不自动加载消息
+      if (conversationsWithoutMessages.length > 0) {
+        const firstConvId = conversationsWithoutMessages[0].id;
+        setCurrentConversation(firstConvId);
+        // 移除自动加载消息，让用户手动点击对话来加载
       }
     } catch (error) {
       console.error('加载对话历史失败:', error);
@@ -146,24 +172,31 @@ function Home() {
   const loadMessagesForConversation = async (conversationId: string) => {
     try {
       const messagesResponse = await apiClient.getMessages(conversationId);
-      
-      if (messagesResponse.success && messagesResponse.data) {
-        const messages: Message[] = messagesResponse.data.map((msg: ApiMessage) => ({
-          id: msg.id,
-          content: msg.content,
-          type: msg.type,
-          timestamp: new Date(msg.created_at),
-          experiment_id: msg.experiment_id,
-          is_conversation_root: msg.is_conversation_root ?? false
-        }));
-        
-        // 更新特定对话的消息
-        setConversations(prev => prev.map(conv => 
-          conv.id === conversationId 
-            ? { ...conv, messages }
-            : conv
-        ));
+
+      if (!messagesResponse.success || !messagesResponse.data) {
+        if (messagesResponse.status === 401) {
+          handleUnauthorized();
+        } else {
+          console.error('加载消息失败:', messagesResponse.error);
+        }
+        return;
       }
+
+      const messages: Message[] = messagesResponse.data.map((msg: ApiMessage) => ({
+        id: msg.id,
+        content: msg.content,
+        type: msg.type,
+        timestamp: new Date(msg.created_at),
+        experiment_id: msg.experiment_id,
+        is_conversation_root: msg.is_conversation_root ?? false
+      }));
+
+      // 更新特定对话的消息
+      setConversations(prev => prev.map(conv => 
+        conv.id === conversationId 
+          ? { ...conv, messages }
+          : conv
+      ));
     } catch (error) {
       console.error('加载消息失败:', error);
     }
@@ -184,24 +217,31 @@ function Home() {
   const handleNewChat = async () => {
     try {
       const response = await apiClient.createConversation('New Conversation');
-      
-      if (response.success && response.data) {
-        const newConversation: Conversation = {
-          id: response.data.id,
-          title: response.data.title,
-          messages: [],
-          lastUpdated: new Date(response.data.created_at)
-        };
-        
-        setConversations(prev => [newConversation, ...prev]);
-        setCurrentConversation(response.data.id);
-        setInputMessage('');
-        
-        // 自动聚焦到输入框
-        setTimeout(() => {
-          inputRef.current?.focus();
-        }, 100);
+
+      if (!response.success || !response.data) {
+        if (response.status === 401) {
+          handleUnauthorized();
+        } else {
+          console.error('创建对话失败:', response.error);
+        }
+        return;
       }
+
+      const newConversation: Conversation = {
+        id: response.data.id,
+        title: response.data.title,
+        messages: [],
+        lastUpdated: new Date(response.data.created_at)
+      };
+
+      setConversations(prev => [newConversation, ...prev]);
+      setCurrentConversation(response.data.id);
+      setInputMessage('');
+
+      // 自动聚焦到输入框
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     } catch (error) {
       console.error('Failed to create new conversation:', error);
     }
@@ -255,53 +295,58 @@ function Home() {
       const response = await apiClient.deleteConversation(conversationId);
       console.warn('📡 [DELETE DEBUG] 服务器响应:', JSON.stringify(response, null, 2));
       
-      if (response.success) {
-        console.warn('✅ [DELETE DEBUG] 服务器确认删除成功，更新前端状态...');
-        
-        // 计算删除后的剩余对话
-        const remainingConversations = conversations.filter(conv => conv.id !== conversationId);
-        console.warn('📊 [DELETE DEBUG] 删除后剩余对话数量:', remainingConversations.length);
-        console.warn('📋 [DELETE DEBUG] 剩余对话列表:', remainingConversations.map(c => ({ id: c.id, title: c.title })));
-        
-        // 更新本地状态
-        console.warn('🔄 [DELETE DEBUG] 更新本地状态...');
-        setConversations(remainingConversations);
-        
-        // If the deleted conversation is the current one, switch to another conversation or create a new one
-        if (currentConversation === conversationId) {
-          console.warn('🔄 [DELETE DEBUG] 删除的是当前对话，需要切换...');
-          if (remainingConversations.length > 0) {
-            console.warn('➡️ [DELETE DEBUG] 切换到第一个剩余对话:', remainingConversations[0].id);
-            setCurrentConversation(remainingConversations[0].id);
+      if (!response.success) {
+        if (response.status === 401) {
+          handleUnauthorized();
+        } else {
+          console.error('删除对话失败:', response.error);
+        }
+        return;
+      }
+
+      console.warn('✅ [DELETE DEBUG] 服务器确认删除成功，更新前端状态...');
+      
+      const remainingConversations = conversations.filter(conv => conv.id !== conversationId);
+      console.warn('📊 [DELETE DEBUG] 删除后剩余对话数量:', remainingConversations.length);
+      console.warn('📋 [DELETE DEBUG] 剩余对话列表:', remainingConversations.map(c => ({ id: c.id, title: c.title })));
+
+      console.warn('🔄 [DELETE DEBUG] 更新本地状态...');
+      setConversations(remainingConversations);
+
+      if (currentConversation === conversationId) {
+        console.warn('🔄 [DELETE DEBUG] 删除的是当前对话，需要切换...');
+        if (remainingConversations.length > 0) {
+          console.warn('➡️ [DELETE DEBUG] 切换到第一个剩余对话:', remainingConversations[0].id);
+          setCurrentConversation(remainingConversations[0].id);
+        } else {
+          console.warn('🆕 [DELETE DEBUG] 没有剩余对话，创建新对话...');
+          setCurrentConversation('');
+          handleNewChat();
+        }
+      }
+
+      console.warn('🎉 [DELETE DEBUG] 删除操作完成');
+
+      console.warn('🔄 [DELETE DEBUG] 重新加载对话列表以确保同步...');
+      try {
+        const conversationsResponse = await apiClient.getConversations();
+        if (!conversationsResponse.success || !conversationsResponse.data) {
+          if (conversationsResponse.status === 401) {
+            handleUnauthorized();
           } else {
-            console.warn('🆕 [DELETE DEBUG] 没有剩余对话，创建新对话...');
-            setCurrentConversation('');
-            handleNewChat();
+            console.error('重新加载对话列表失败:', conversationsResponse.error);
           }
+        } else {
+          console.warn('📋 [DELETE DEBUG] 从服务器重新加载的对话列表:', conversationsResponse.data.length);
+          setConversations(conversationsResponse.data.map(conv => ({
+            id: conv.id,
+            title: conv.title,
+            messages: [],
+            lastUpdated: new Date(conv.updated_at)
+          })));
         }
-        
-        console.warn('🎉 [DELETE DEBUG] 删除操作完成');
-        
-        // 强制重新加载对话列表以确保同步
-        console.warn('🔄 [DELETE DEBUG] 重新加载对话列表以确保同步...');
-        try {
-          const conversationsResponse = await apiClient.getConversations();
-          if (conversationsResponse.success && conversationsResponse.data) {
-            console.warn('📋 [DELETE DEBUG] 从服务器重新加载的对话列表:', conversationsResponse.data.length);
-            setConversations(conversationsResponse.data.map(conv => ({
-              id: conv.id,
-              title: conv.title,
-              messages: [],
-              lastUpdated: new Date(conv.updated_at)
-            })));
-          }
-        } catch (reloadError) {
-          console.error('❌ [DELETE DEBUG] 重新加载对话列表失败:', reloadError);
-        }
-        
-      } else {
-        console.error('❌ [DELETE DEBUG] 服务器删除失败:', response);
-        alert('删除对话失败，请稍后重试。');
+      } catch (reloadError) {
+        console.error('❌ [DELETE DEBUG] 重新加载对话列表失败:', reloadError);
       }
     } catch (error) {
       console.error('❌ [DELETE DEBUG] 删除对话失败:', error);
@@ -720,7 +765,23 @@ function Home() {
 
       {/* 主内容区域 */}
       <div className="flex-1 flex flex-col">
-
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-4 border-b border-dark-border bg-dark-bg-secondary gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.4em] text-dark-text-secondary">Workspace</p>
+            <h2 className="text-lg font-semibold text-dark-text">
+              {user?.username ? `欢迎，${user.username}` : '欢迎使用实验工作台'}
+            </h2>
+          </div>
+          <div className="flex items-center gap-3">
+            {user?.email && <span className="text-sm text-dark-text-secondary hidden sm:block">{user.email}</span>}
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1.5 rounded-md border border-dark-border text-dark-text-secondary hover:bg-dark-bg-tertiary transition-colors"
+            >
+              退出登录
+            </button>
+          </div>
+        </div>
 
         {/* 消息区域 */}
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 pb-32 relative">

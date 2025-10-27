@@ -1,3 +1,6 @@
+import { useAuthStore } from '@/hooks/useAuth';
+import type { AuthSuccessPayload, AuthUser } from '@/types/auth';
+
 const API_BASE_URL = '/api';
 
 export interface ExperimentGenerateRequest {
@@ -27,6 +30,7 @@ export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  status?: number;
 }
 
 export interface Conversation {
@@ -67,63 +71,114 @@ export interface SurveySubmitRequest {
   suggestions: string;
 }
 
+export interface CaptchaChallenge {
+  id: string;
+  svg: string;
+  expiresIn: number;
+}
+
+const getAuthToken = (): string | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  return useAuthStore.getState().token;
+};
+
+const buildAuthHeaders = (): Record<string, string> => {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 class ApiClient {
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...buildAuthHeaders(),
+        ...(options.headers as Record<string, string> | undefined),
+      };
+
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
         ...options,
+        headers,
       });
 
+      const status = response.status;
+      const responseText = await response.text();
+
       if (!response.ok) {
-        try {
-          // First read response text
-          const responseText = await response.text();
+        if (responseText) {
           try {
-            // Try to parse as JSON
             const errorData = JSON.parse(responseText);
+            if (status === 401 && typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('app:unauthorized'));
+            }
             return {
               success: false,
-              error: errorData.error || `HTTP ${response.status}: ${response.statusText}`,
+              error: errorData.error || `HTTP ${status}: ${response.statusText}`,
+              status,
             };
-          } catch (jsonError) {
-            // If not JSON format, use response text directly
+          } catch {
+            if (status === 401 && typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('app:unauthorized'));
+            }
             return {
               success: false,
-              error: `HTTP ${response.status}: ${responseText || response.statusText}`,
+              error: `HTTP ${status}: ${responseText}`,
+              status,
             };
           }
-        } catch (textError) {
-          return {
-            success: false,
-            error: `HTTP ${response.status}: ${response.statusText}`,
-          };
         }
+
+        if (status === 401 && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('app:unauthorized'));
+        }
+
+        return {
+          success: false,
+          error: `HTTP ${status}: ${response.statusText}`,
+          status,
+        };
       }
 
-      const data = await response.json();
-      
-      // Check if backend already returns ApiResponse format
-      if (data && typeof data === 'object' && 'success' in data) {
-        return data as ApiResponse<T>;
+      if (!responseText) {
+        return {
+          success: true,
+          status,
+        };
       }
-      
-      // Backend returns data directly, need to wrap as ApiResponse format
-      return {
-        success: true,
-        data: data as T,
-      };
+
+      try {
+        const data = JSON.parse(responseText);
+        
+        if (data && typeof data === 'object' && 'success' in data) {
+          return {
+            ...(data as ApiResponse<T>),
+            status,
+          };
+        }
+
+        return {
+          success: true,
+          data: data as T,
+          status,
+        };
+      } catch {
+        return {
+          success: true,
+          data: responseText as unknown as T,
+          status,
+        };
+      }
     } catch (error) {
       console.error('API request failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Network request failed',
+        status: undefined,
       };
     }
   }
@@ -141,6 +196,7 @@ class ApiClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...buildAuthHeaders(),
         },
         body: JSON.stringify(request),
       });
@@ -264,6 +320,48 @@ class ApiClient {
   }
 
   /**
+   * Authentication helpers
+   */
+  async getCaptcha(): Promise<ApiResponse<CaptchaChallenge>> {
+    return this.request<CaptchaChallenge>('/auth/captcha');
+  }
+
+  async register(
+    payload: {
+      username: string;
+      email: string;
+      password: string;
+      confirmPassword: string;
+      captchaId: string;
+      captchaAnswer: string;
+    }
+  ): Promise<ApiResponse<AuthSuccessPayload>> {
+    return this.request<AuthSuccessPayload>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async login(
+    payload: { email: string; password: string; captchaId: string; captchaAnswer: string }
+  ): Promise<ApiResponse<AuthSuccessPayload>> {
+    return this.request<AuthSuccessPayload>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async logout(): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>('/auth/logout', {
+      method: 'POST',
+    });
+  }
+
+  async getCurrentUser(): Promise<ApiResponse<AuthUser>> {
+    return this.request<AuthUser>('/auth/me');
+  }
+
+  /**
    * Get all conversations
    */
   async getConversations(): Promise<ApiResponse<Conversation[]>> {
@@ -330,7 +428,11 @@ class ApiClient {
 // Conversations API (now handled by messages API)
 export const conversationsApi = {
   getAll: async (): Promise<Conversation[]> => {
-    const response = await fetch('/api/messages/conversations');
+    const response = await fetch('/api/messages/conversations', {
+      headers: {
+        ...buildAuthHeaders(),
+      }
+    });
     if (!response.ok) {
       throw new Error('Failed to fetch conversations');
     }
@@ -342,6 +444,7 @@ export const conversationsApi = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...buildAuthHeaders(),
       },
       body: JSON.stringify({ title }),
     });
@@ -356,6 +459,7 @@ export const conversationsApi = {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        ...buildAuthHeaders(),
       },
       body: JSON.stringify({ title }),
     });
@@ -367,6 +471,9 @@ export const conversationsApi = {
   delete: async (id: string): Promise<void> => {
     const response = await fetch(`/api/messages/conversations/${id}`, {
       method: 'DELETE',
+      headers: {
+        ...buildAuthHeaders(),
+      }
     });
     if (!response.ok) {
       throw new Error('Failed to delete conversation');
@@ -377,7 +484,11 @@ export const conversationsApi = {
 // Messages API
 export const messagesApi = {
   getByConversation: async (conversationId: string): Promise<Message[]> => {
-    const response = await fetch(`/api/messages/conversations/${conversationId}/messages`);
+    const response = await fetch(`/api/messages/conversations/${conversationId}/messages`, {
+      headers: {
+        ...buildAuthHeaders(),
+      }
+    });
     if (!response.ok) {
       throw new Error('Failed to fetch messages');
     }
@@ -389,6 +500,7 @@ export const messagesApi = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...buildAuthHeaders(),
       },
       body: JSON.stringify(message),
     });
@@ -403,6 +515,7 @@ export const messagesApi = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...buildAuthHeaders(),
       },
       body: JSON.stringify({
         message: content,

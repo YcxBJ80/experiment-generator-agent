@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
@@ -6,14 +7,17 @@ dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+const supabaseKey = supabaseServiceRoleKey || supabaseAnonKey;
+
+if (!supabaseUrl || !supabaseKey) {
   console.warn('Supabase configuration missing. Please check your environment variables.');
 }
 
 // Create Supabase client
-export const supabase = supabaseUrl && supabaseAnonKey 
-  ? createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = supabaseUrl && supabaseKey 
+  ? createClient(supabaseUrl, supabaseKey, {
       auth: {
         persistSession: false
       }
@@ -26,6 +30,7 @@ export interface Conversation {
   title: string;
   created_at: string;
   updated_at: string;
+  user_id?: string | null;
   messages?: Message[];
 }
 
@@ -40,6 +45,7 @@ export interface Message {
   js_content?: string;
   title?: string;
   is_conversation_root?: boolean;
+  user_id?: string | null;
   created_at: string;
   updated_at?: string;
 }
@@ -52,22 +58,29 @@ export interface Survey {
   concept_understanding: number;
   suggestions: string;
   created_at: string;
+  user_id?: string | null;
 }
 
 // Helper functions for database operations
 export class DatabaseService {
-  static async getConversations(): Promise<Conversation[]> {
+  static async getConversations(userId: string): Promise<Conversation[]> {
     if (!supabase) {
       console.warn('Supabase not configured, returning empty array');
       return [];
     }
 
+    if (!userId) {
+      console.warn('User id missing when fetching conversations');
+      return [];
+    }
+
     try {
-      console.log('Attempting to fetch conversations from messages table...');
+      console.log('Attempting to fetch conversations from messages table for user:', userId);
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('is_conversation_root', true)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -84,7 +97,8 @@ export class DatabaseService {
         id: msg.conversation_id,
         title: msg.title || 'New Conversation',
         created_at: msg.created_at,
-        updated_at: msg.updated_at || msg.created_at
+        updated_at: msg.updated_at || msg.created_at,
+        user_id: msg.user_id
       }));
 
       console.log(`Successfully fetched ${conversations.length} conversations`);
@@ -100,14 +114,19 @@ export class DatabaseService {
     }
   }
 
-  static async createConversation(title: string = 'New Conversation'): Promise<Conversation | null> {
+  static async createConversation(title: string = 'New Conversation', userId: string): Promise<Conversation | null> {
     if (!supabase) {
       console.warn('Supabase not configured, returning null');
       return null;
     }
 
+    if (!userId) {
+      console.warn('User id missing when creating conversation');
+      return null;
+    }
+
     try {
-      console.log('Creating new conversation with title:', title);
+      console.log('Creating new conversation with title:', title, 'for user:', userId);
       const conversationId = crypto.randomUUID();
       
       const { data, error } = await supabase
@@ -117,7 +136,8 @@ export class DatabaseService {
           content: '',
           type: 'assistant',
           title,
-          is_conversation_root: true
+          is_conversation_root: true,
+          user_id: userId
         }])
         .select()
         .single();
@@ -131,7 +151,8 @@ export class DatabaseService {
         id: conversationId,
         title,
         created_at: data.created_at,
-        updated_at: data.updated_at || data.created_at
+        updated_at: data.updated_at || data.created_at,
+        user_id: userId
       };
 
       console.log('Successfully created conversation:', conversation);
@@ -142,9 +163,14 @@ export class DatabaseService {
     }
   }
 
-  static async updateConversationTitle(id: string, title: string): Promise<boolean> {
+  static async updateConversationTitle(id: string, title: string, userId: string): Promise<boolean> {
     if (!supabase) {
       console.warn('Supabase not configured');
+      return false;
+    }
+
+    if (!userId) {
+      console.warn('User id missing when updating conversation title');
       return false;
     }
 
@@ -153,7 +179,8 @@ export class DatabaseService {
         .from('messages')
         .update({ title })
         .eq('conversation_id', id)
-        .eq('is_conversation_root', true);
+        .eq('is_conversation_root', true)
+        .eq('user_id', userId);
 
       if (error) {
         console.error('Error updating conversation title:', error);
@@ -167,18 +194,24 @@ export class DatabaseService {
     }
   }
 
-  static async getMessages(conversationId: string): Promise<Message[]> {
+  static async getMessages(conversationId: string, userId: string): Promise<Message[]> {
     if (!supabase) {
       console.warn('Supabase not configured, returning empty array');
       return [];
     }
 
+    if (!userId) {
+      console.warn('User id missing when fetching messages');
+      return [];
+    }
+
     try {
-      console.log(`Attempting to fetch messages for conversation: ${conversationId}`);
+      console.log(`Attempting to fetch messages for conversation: ${conversationId}, user: ${userId}`);
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)
+        .eq('user_id', userId)
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -206,9 +239,16 @@ export class DatabaseService {
     }
   }
 
-  static async createMessage(message: Omit<Message, 'id' | 'created_at' | 'updated_at'>): Promise<Message | null> {
+  static async createMessage(
+    message: Omit<Message, 'id' | 'created_at' | 'updated_at'> & { user_id: string }
+  ): Promise<Message | null> {
     if (!supabase) {
       console.warn('Supabase not configured');
+      return null;
+    }
+
+    if (!message.user_id) {
+      console.warn('User id missing when creating message');
       return null;
     }
 
@@ -238,19 +278,27 @@ export class DatabaseService {
     }
   }
 
-  static async updateMessage(id: string, updates: Partial<Omit<Message, 'id' | 'created_at'>>): Promise<Message | null> {
+  static async updateMessage(
+    id: string,
+    updates: Partial<Omit<Message, 'id' | 'created_at'>>,
+    userId?: string
+  ): Promise<Message | null> {
     if (!supabase) {
       console.warn('Supabase not configured');
       return null;
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('messages')
         .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .eq('id', id);
+
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      const { data, error } = await query.select().single();
 
       if (error) {
         console.error('Error updating message:', error);
@@ -264,9 +312,14 @@ export class DatabaseService {
     }
   }
 
-  static async deleteConversation(id: string): Promise<boolean> {
+  static async deleteConversation(id: string, userId: string): Promise<boolean> {
     if (!supabase) {
       console.warn('Supabase not configured');
+      return false;
+    }
+
+    if (!userId) {
+      console.warn('User id missing when deleting conversation');
       return false;
     }
 
@@ -275,7 +328,8 @@ export class DatabaseService {
       const { error } = await supabase
         .from('messages')
         .delete()
-        .eq('conversation_id', id);
+        .eq('conversation_id', id)
+        .eq('user_id', userId);
 
       if (error) {
         console.error('Error deleting conversation messages:', error);
