@@ -153,7 +153,8 @@ function Home() {
           content: msg.content,
           type: msg.type,
           timestamp: new Date(msg.created_at),
-          experiment_id: msg.experiment_id
+          experiment_id: msg.experiment_id,
+          is_conversation_root: msg.is_conversation_root ?? false
         }));
         
         // 更新特定对话的消息
@@ -323,7 +324,10 @@ function Home() {
 
     let activeConversationId = currentConversation;
     let conversationRecord = conversations.find(conv => conv.id === activeConversationId) || null;
-    let hadMessagesBeforeSend = conversationRecord ? conversationRecord.messages.length > 0 : false;
+    const meaningfulMessageCount = conversationRecord
+      ? conversationRecord.messages.filter(msg => !msg.is_conversation_root).length
+      : 0;
+    let hadMessagesBeforeSend = meaningfulMessageCount > 0;
 
     try {
       if (!activeConversationId) {
@@ -391,7 +395,8 @@ function Home() {
         id: userMessageResponse.data.id,
         content: userMessageResponse.data.content,
         type: 'user',
-        timestamp: new Date(userMessageResponse.data.created_at)
+        timestamp: new Date(userMessageResponse.data.created_at),
+        is_conversation_root: false
       };
       
       setConversations(prev => {
@@ -420,6 +425,7 @@ function Home() {
         content: '',
         type: 'assistant',
         timestamp: new Date(assistantMessageResponse.data.created_at),
+        is_conversation_root: false,
         isTyping: true
       };
       
@@ -615,7 +621,8 @@ function Home() {
               id: errorMessageResponse.data.id,
               content: errorMessageResponse.data.content,
               type: 'assistant',
-              timestamp: new Date(errorMessageResponse.data.created_at)
+              timestamp: new Date(errorMessageResponse.data.created_at),
+              is_conversation_root: false
             };
             
             setConversations(prev => {

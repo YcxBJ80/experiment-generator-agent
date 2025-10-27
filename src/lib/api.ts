@@ -41,6 +41,7 @@ export interface Message {
   conversation_id: string;
   content: string;
   type: 'user' | 'assistant';
+  is_conversation_root?: boolean;
   experiment_id?: string;
   html_content?: string;
   css_content?: string;
