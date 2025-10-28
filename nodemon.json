@@ -1,8 +1,8 @@
 {
-  "watch": ["api"],
+  "watch": ["server"],
   "ext": "ts,mts,js,json",
-  "ignore": ["api/dist/*"],
-  "exec": "tsx api/server.ts",
+  "ignore": ["server/dist/*"],
+  "exec": "tsx server/server.ts",
   "env": {
     "NODE_ENV": "development"
   },
