@@ -11,6 +11,110 @@ interface ExperimentDisplayData {
   jsContent: string;
 }
 
+const STORAGE_POLYFILL_SCRIPT = `<script>
+(() => {
+  const createStorage = () => {
+    const data = {};
+    return {
+      getItem(key) {
+        return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null;
+      },
+      setItem(key, value) {
+        data[key] = String(value);
+      },
+      removeItem(key) {
+        delete data[key];
+      },
+      clear() {
+        Object.keys(data).forEach((k) => {
+          delete data[k];
+        });
+      },
+      key(index) {
+        const keys = Object.keys(data);
+        return index >= 0 && index < keys.length ? keys[index] : null;
+      },
+      get length() {
+        return Object.keys(data).length;
+      }
+    };
+  };
+
+  const defineStorage = (name) => {
+    const storage = createStorage();
+    try {
+      Object.defineProperty(window, name, {
+        configurable: true,
+        enumerable: true,
+        value: storage
+      });
+    } catch (error) {
+      window[name] = storage;
+    }
+  };
+
+  defineStorage('localStorage');
+  defineStorage('sessionStorage');
+})();
+</script>`;
+
+const buildIframeContent = (experiment: ExperimentDisplayData) => {
+  const styleContent = experiment.cssContent?.trim();
+  const styleBlock = styleContent
+    ? `<style>${styleContent}</style>`
+    : '';
+  const scriptContent = experiment.jsContent?.trim();
+  const scriptBlock = scriptContent
+    ? `<script>${scriptContent}</script>`
+    : '';
+  const hasDoctype = /<!doctype html>/i.test(experiment.htmlContent);
+
+  if (hasDoctype) {
+    let html = experiment.htmlContent;
+
+    if (/<head[^>]*>/i.test(html)) {
+      html = html.replace(
+        /<head([^>]*)>/i,
+        `<head$1>${STORAGE_POLYFILL_SCRIPT}${styleBlock ? `\n${styleBlock}` : ''}`
+      );
+    } else if (/<html[^>]*>/i.test(html)) {
+      html = html.replace(
+        /<html([^>]*)>/i,
+        `<html$1><head>${STORAGE_POLYFILL_SCRIPT}${styleBlock ? `\n${styleBlock}` : ''}</head>`
+      );
+    } else {
+      html = `${STORAGE_POLYFILL_SCRIPT}${styleBlock ? `\n${styleBlock}` : ''}${html}`;
+    }
+
+    if (scriptBlock) {
+      if (/<\/body>/i.test(html)) {
+        html = html.replace(/<\/body>/i, `${scriptBlock}</body>`);
+      } else {
+        html += scriptBlock;
+      }
+    }
+
+    return html;
+  }
+
+  const sanitizedTitle = experiment.title.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${sanitizedTitle}</title>
+  ${STORAGE_POLYFILL_SCRIPT}
+  ${styleBlock}
+</head>
+<body>
+  ${experiment.htmlContent}
+  ${scriptBlock}
+</body>
+</html>`;
+};
+
 export default function Demo() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -72,26 +176,7 @@ export default function Demo() {
       // Use complete HTML content directly
       const iframe = document.getElementById('experiment-iframe') as HTMLIFrameElement;
       if (iframe) {
-        // If html_content is already a complete HTML document, use it directly
-        if (experiment.htmlContent.includes('<!doctype html>') || experiment.htmlContent.includes('<!DOCTYPE html>')) {
-          iframe.srcdoc = experiment.htmlContent;
-        } else {
-          // If not a complete document, wrap it
-          const fullHtml = `
-            <!DOCTYPE html>
-            <html lang="zh-CN">
-            <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>${experiment.title}</title>
-            </head>
-            <body>
-              ${experiment.htmlContent}
-            </body>
-            </html>
-          `;
-          iframe.srcdoc = fullHtml;
-        }
+        iframe.srcdoc = buildIframeContent(experiment);
       }
     }
   }, [experiment]);
