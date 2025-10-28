@@ -7,6 +7,8 @@ import cors from 'cors';
 import path from 'path';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
+import authRoutes from './routes/auth.js';
+import experimentsRoutes from './routes/experiments.js';
 import messagesRoutes from './routes/messages.js';
 
 // for esm mode
@@ -43,6 +45,8 @@ app.get('/', (req: ExpressRequest, res: ExpressResponse) => {
 /**
  * API Routes
  */
+app.use('/api/auth', authRoutes);
+app.use('/api/experiments', experimentsRoutes);
 app.use('/api/messages', messagesRoutes);
 
 app.get('/api/health', (req: ExpressRequest, res: ExpressResponse) => {

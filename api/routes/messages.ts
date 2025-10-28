@@ -1,4 +1,5 @@
 import express, { Request as ExpressRequest, Response as ExpressResponse } from 'express';
+import { ServerResponse } from 'http';
 import { randomUUID } from 'crypto';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
@@ -7,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { perplexityMCPClient } from '../lib/perplexityMcpClient.js';
 import { JavaScriptValidator } from '../lib/jsValidator.js';
 import { DatabaseService, type Message as DbMessage } from '../lib/supabase.js';
+import { requireAuth, type AuthenticatedRequest } from '../middleware/auth.js';
 
 // Ensure environment variables are loaded
 const __filename = fileURLToPath(import.meta.url);
@@ -16,9 +18,14 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const router = express.Router();
 
 // Conversations endpoints (integrated into messages)
-router.get('/conversations', async (_req: ExpressRequest, res: ExpressResponse) => {
+router.get('/conversations', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
-    const conversations = await DatabaseService.getConversations();
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const conversations = await DatabaseService.getConversations(userId);
     res.json(conversations);
   } catch (error) {
     console.error('Error fetching conversations:', error);
@@ -26,10 +33,15 @@ router.get('/conversations', async (_req: ExpressRequest, res: ExpressResponse) 
   }
 });
 
-router.post('/conversations', async (req: ExpressRequest, res: ExpressResponse) => {
+router.post('/conversations', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const { title } = req.body;
-    const conversation = await DatabaseService.createConversation(title || 'New Conversation');
+    const conversation = await DatabaseService.createConversation(title || 'New Conversation', userId);
     
     if (!conversation) {
       return res.status(500).json({ error: 'Failed to create conversation' });
@@ -42,12 +54,17 @@ router.post('/conversations', async (req: ExpressRequest, res: ExpressResponse) 
   }
 });
 
-router.put('/conversations/:id/title', async (req: ExpressRequest, res: ExpressResponse) => {
+router.put('/conversations/:id/title', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const { id } = req.params;
     const { title } = req.body;
     
-    const success = await DatabaseService.updateConversationTitle(id, title);
+    const success = await DatabaseService.updateConversationTitle(id, title, userId);
     
     if (!success) {
       return res.status(500).json({ error: 'Failed to update conversation title' });
@@ -60,10 +77,15 @@ router.put('/conversations/:id/title', async (req: ExpressRequest, res: ExpressR
   }
 });
 
-router.delete('/conversations/:id', async (req: ExpressRequest, res: ExpressResponse) => {
+router.delete('/conversations/:id', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const { id } = req.params;
-    const success = await DatabaseService.deleteConversation(id);
+    const success = await DatabaseService.deleteConversation(id, userId);
     
     if (!success) {
       return res.status(500).json({ error: 'Failed to delete conversation' });
@@ -77,10 +99,15 @@ router.delete('/conversations/:id', async (req: ExpressRequest, res: ExpressResp
 });
 
 // Messages endpoints
-router.get('/conversations/:conversationId/messages', async (req: ExpressRequest, res: ExpressResponse) => {
+router.get('/conversations/:conversationId/messages', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const { conversationId } = req.params;
-    const messages = await DatabaseService.getMessages(conversationId);
+    const messages = await DatabaseService.getMessages(conversationId, userId);
     res.json(messages);
   } catch (error) {
     console.error('Error fetching messages:', error);
@@ -88,12 +115,18 @@ router.get('/conversations/:conversationId/messages', async (req: ExpressRequest
   }
 });
 
-router.post('/conversations/:conversationId/messages', async (req: ExpressRequest, res: ExpressResponse) => {
+router.post('/conversations/:conversationId/messages', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const { conversationId } = req.params;
     const messageData = {
       ...req.body,
-      conversation_id: conversationId
+      conversation_id: conversationId,
+      user_id: userId
     };
     
     const message = await DatabaseService.createMessage(messageData);
@@ -359,10 +392,18 @@ function buildChatHistory(messages: DbMessage[], placeholderId?: string): ChatHi
 /**
  * Generate experiment demo with streaming
  */
-router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse) => {
+router.post('/generate-stream', requireAuth, async (req: AuthenticatedRequest, res: ExpressResponse) => {
   console.log('🔥 Stream endpoint called!');
   console.log('Request body:', req.body);
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
     const { prompt, conversation_id, message_id, model }: GenerateExperimentRequest & { message_id?: string } = req.body;
     
     const selectedModel = model || 'openai/gpt-5';
@@ -395,7 +436,7 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
 
     if (conversation_id) {
       try {
-        const conversationMessages = await DatabaseService.getMessages(conversation_id);
+        const conversationMessages = await DatabaseService.getMessages(conversation_id, userId);
         chatHistory = buildChatHistory(conversationMessages, message_id);
       } catch (historyError) {
         console.error('Failed to load conversation history:', historyError);
@@ -418,9 +459,13 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
 
       try {
         experimentId = randomUUID();
-        const updated = await DatabaseService.updateMessage(message_id, {
-          experiment_id: experimentId
-        });
+        const updated = await DatabaseService.updateMessage(
+          message_id,
+          {
+            experiment_id: experimentId
+          },
+          userId
+        );
 
         if (!updated) {
           throw new Error('Database update returned null');
@@ -515,27 +560,39 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
                 const titleMatch = htmlContent.match(/<title>(.*?)<\/title>/i);
                 const title = titleMatch ? titleMatch[1] : 'Experiment Demo';
                 
-                await DatabaseService.updateMessage(message_id, {
-                  content: fullContent,
-                  experiment_id: resolvedExperimentId,
-                  html_content: htmlContent
-                });
+                await DatabaseService.updateMessage(
+                  message_id,
+                  {
+                    content: fullContent,
+                    experiment_id: resolvedExperimentId,
+                    html_content: htmlContent
+                  },
+                  userId
+                );
                 
                 console.log('✅ Message updated with experiment_id:', resolvedExperimentId, 'Title:', title);
               } else {
                 console.warn('⚠️ Failed to extract HTML code block from generated content');
-                await DatabaseService.updateMessage(message_id, {
-                  content: fullContent
-                });
+                await DatabaseService.updateMessage(
+                  message_id,
+                  {
+                    content: fullContent
+                  },
+                  userId
+                );
               }
             } catch (error) {
               console.error('❌ Error processing experiment data or updating message:', error);
             }
           } else {
             try {
-              await DatabaseService.updateMessage(message_id, {
-                content: fullContent.trim()
-              });
+              await DatabaseService.updateMessage(
+                message_id,
+                {
+                  content: fullContent.trim()
+                },
+                userId
+              );
               console.log('✅ Chat response stored for message:', message_id);
             } catch (error) {
               console.error('❌ Failed to persist chat response:', error);
@@ -571,9 +628,17 @@ router.post('/generate-stream', async (req: ExpressRequest, res: ExpressResponse
 /**
  * Create message
  */
-router.post('/', async (req: ExpressRequest, res: ExpressResponse) => {
+router.post('/', requireAuth, async (req: AuthenticatedRequest, res: ExpressResponse) => {
   try {
     const { conversation_id, content, type, experiment_id, html_content, css_content, js_content } = req.body;
+    
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
 
     console.log(`📝 Creating message, conversation ID: ${conversation_id}, type: ${type}`);
     
@@ -607,7 +672,8 @@ router.post('/', async (req: ExpressRequest, res: ExpressResponse) => {
       experiment_id: experiment_id || null,
       html_content: html_content || null,
       css_content: css_content || null,
-      js_content: js_content || null
+      js_content: js_content || null,
+      user_id: userId
     });
 
     if (!message) {
@@ -636,15 +702,23 @@ router.post('/', async (req: ExpressRequest, res: ExpressResponse) => {
 /**
  * Update message
  */
-router.put('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
+router.put('/:id', requireAuth, async (req: AuthenticatedRequest, res: ExpressResponse) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
     
     console.log(`📝 Updating message, ID: ${id}`);
     console.log('Update content:', updates);
     
-    const updatedMessage = await DatabaseService.updateMessage(id, updates);
+    const updatedMessage = await DatabaseService.updateMessage(id, updates, userId);
     
     if (!updatedMessage) {
       return res.status(404).json({
@@ -665,26 +739,6 @@ router.put('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
     res.status(500).json({
       success: false,
       error: 'Failed to update message'
-    });
-  }
-});
-
-router.post('/surveys', async (req: ExpressRequest, res: ExpressResponse) => {
-  try {
-    const survey = await DatabaseService.createSurvey(req.body);
-    if (!survey) {
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to submit survey'
-      });
-    }
-
-    res.json({ success: true, data: survey });
-  } catch (error) {
-    console.error('Failed to submit survey:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to submit survey'
     });
   }
 });

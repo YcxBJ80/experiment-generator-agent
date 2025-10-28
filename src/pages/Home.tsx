@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, Send, Play, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { apiClient, type ExperimentData, type Conversation as ApiConversation, type Message as ApiMessage } from '@/lib/api';
+import { useAuth, useAuthActions } from '@/hooks/useAuth';
 import LightRays from '../components/LightRays';
 import DonationButton from '../components/DonationButton';
 import SurveyModal from '../components/SurveyModal';
@@ -39,6 +40,8 @@ interface Conversation {
 function Home() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  const { clearAuth } = useAuthActions();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<string>('');
   const [inputMessage, setInputMessage] = useState('');
@@ -60,7 +63,19 @@ function Home() {
   const [surveyExperimentId, setSurveyExperimentId] = useState<string>('');
 
   const handleUnauthorized = () => {
-    console.warn('Unauthorized response received, ignoring because auth is disabled.');
+    clearAuth();
+    navigate('/login', { replace: true });
+  };
+
+  const handleLogout = async () => {
+    try {
+      await apiClient.logout();
+    } catch (error) {
+      console.warn('Logout request failed:', error);
+    } finally {
+      clearAuth();
+      navigate('/', { replace: true });
+    }
   };
 
   const markdownRemarkPlugins = useMemo(() => [remarkGfm, remarkMath, remarkBreaks], []);
@@ -751,9 +766,22 @@ function Home() {
 
       {/* 主内容区域 */}
       <div className="flex-1 flex flex-col">
-        <div className="px-6 py-4 border-b border-dark-border bg-dark-bg-secondary">
-          <p className="text-xs uppercase tracking-[0.4em] text-dark-text-secondary">Workspace</p>
-          <h2 className="text-lg font-semibold text-dark-text">欢迎使用实验工作台</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-4 border-b border-dark-border bg-dark-bg-secondary gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.4em] text-dark-text-secondary">Workspace</p>
+            <h2 className="text-lg font-semibold text-dark-text">
+              {user?.username ? `欢迎，${user.username}` : '欢迎使用实验工作台'}
+            </h2>
+          </div>
+          <div className="flex items-center gap-3">
+            {user?.email && <span className="text-sm text-dark-text-secondary hidden sm:block">{user.email}</span>}
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1.5 rounded-md border border-dark-border text-dark-text-secondary hover:bg-dark-bg-tertiary transition-colors"
+            >
+              退出登录
+            </button>
+          </div>
         </div>
 
         {/* 消息区域 */}
