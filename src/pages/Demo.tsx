@@ -152,7 +152,8 @@ export default function Demo() {
           id="experiment-iframe"
           className="w-full h-full border-none"
           title={experiment?.title || 'Experiment Demo'}
-          sandbox="allow-scripts allow-same-origin"
+          // Only allow scripts; keeping allow-same-origin would let the experiment access the host context.
+          sandbox="allow-scripts"
         />
       </div>
     </div>

@@ -61,6 +61,12 @@ function Home() {
   // 问卷相关状态
   const [showSurveyModal, setShowSurveyModal] = useState(false);
   const [surveyExperimentId, setSurveyExperimentId] = useState<string>('');
+  const userInitial = useMemo(() => {
+    const source = (user?.username || user?.email || '').trim();
+    if (!source) return 'U';
+    const [firstChar] = Array.from(source);
+    return firstChar ? firstChar.toUpperCase() : 'U';
+  }, [user?.username, user?.email]);
 
   const handleUnauthorized = () => {
     clearAuth();
@@ -765,27 +771,23 @@ function Home() {
       </div>
 
       {/* 主内容区域 */}
-      <div className="flex-1 flex flex-col">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-4 border-b border-dark-border bg-dark-bg-secondary gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-dark-text-secondary">Workspace</p>
-            <h2 className="text-lg font-semibold text-dark-text">
-              {user?.username ? `欢迎，${user.username}` : '欢迎使用实验工作台'}
-            </h2>
-          </div>
-          <div className="flex items-center gap-3">
-            {user?.email && <span className="text-sm text-dark-text-secondary hidden sm:block">{user.email}</span>}
+      <div className="flex-1 flex flex-col relative">
+        <div className="absolute top-4 right-4 sm:right-6 z-20">
+          <div className="flex items-center gap-3 px-4 py-2 bg-dark-bg-secondary border border-dark-border rounded-full shadow-lg">
+            <div className="w-8 h-8 rounded-full bg-primary text-white font-semibold flex items-center justify-center border border-primary/70">
+              {userInitial}
+            </div>
             <button
               onClick={handleLogout}
-              className="px-3 py-1.5 rounded-md border border-dark-border text-dark-text-secondary hover:bg-dark-bg-tertiary transition-colors"
+              className="px-3 py-1.5 rounded-full bg-dark-bg-tertiary border border-dark-border text-dark-text hover:bg-dark-bg-secondary transition-colors"
             >
-              退出登录
+              退出
             </button>
           </div>
         </div>
 
         {/* 消息区域 */}
-        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 pb-32 relative">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 pt-24 pb-32 relative">
           {!isLoading && currentConversation && conversations.find(c => c.id === currentConversation) ? (
             <div className="max-w-4xl mx-auto space-y-4">
               {/* 只在没有消息时显示大标题和Light Rays背景 */}
