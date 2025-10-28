@@ -1,7 +1,7 @@
 # Streaming Output Rendering Check
 
 ## Context
-- **Environment examined:** React client consuming the Express SSE endpoint (`/api/messages/generate-stream`). This matches the “Web前端SSE” case from the provided troubleshooting guide.
+- **Environment examined:** React client consuming the Express SSE endpoint (`/api/messages/generate-stream`). This matches the “Web Frontend SSE” case from the provided troubleshooting guide.
 - **Symptom reported:** streamed assistant text collapsed into a single line until the page refreshes.
 
 ## Findings
@@ -24,4 +24,4 @@
 3. Confirm that inline `$a^2$` and block `$$E=mc^2$$` math render immediately once the chunk with LaTeX arrives.
 4. Refresh the page to ensure the persisted conversation still renders with Markdown/LaTeX formatting (database-stored content remains intact).
 
-These checks correspond to the troubleshooting guidance for the **Web前端SSE** scenario: the frontend now appends `textContent`-equivalent data (via React state) and the backend sends well-formed SSE frames so newline and indentation are honoured.
+These checks correspond to the troubleshooting guidance for the **Web Frontend SSE** scenario: the frontend now appends `textContent`-equivalent data (via React state) and the backend sends well-formed SSE frames so newline and indentation are honoured.

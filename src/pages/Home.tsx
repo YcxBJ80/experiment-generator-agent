@@ -52,13 +52,13 @@ function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  // 流式响应状态
+  // Streaming response state
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
-  // 滚动到底部按钮状态
+  // Scroll-to-bottom button visibility
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  // 搜索生成状态
+  // Search-and-generate indicator state
   const [isSearchingGenerating, setIsSearchingGenerating] = useState(false);
-  // 问卷相关状态
+  // Survey modal state
   const [showSurveyModal, setShowSurveyModal] = useState(false);
   const [surveyExperimentId, setSurveyExperimentId] = useState<string>('');
   const userInitial = useMemo(() => {
@@ -95,7 +95,7 @@ function Home() {
     []
   );
 
-  // 可选择的模型列表
+  // Supported model list
   const availableModels = [
     { id: 'openai/gpt-5', name: 'GPT-5' },
     { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini' },
@@ -104,23 +104,23 @@ function Home() {
     { id: 'qwen/qwen3-coder', name: 'Qwen3 Coder' },
   ];
 
-  // 加载对话历史
+  // Load conversation list
   useEffect(() => {
     loadConversations();
   }, []);
 
-  // 处理从Demo页面传递过来的问卷触发状态
+  // Handle survey trigger passed from the demo page
   useEffect(() => {
     const state = location.state as { showSurvey?: boolean; experimentId?: string } | null;
     if (state?.showSurvey && state?.experimentId) {
       setShowSurveyModal(true);
       setSurveyExperimentId(state.experimentId);
-      // 清除location state以防止重复触发
+      // Clear location state to avoid repeated triggers
       navigate(location.pathname, { replace: true });
     }
   }, [location.state, navigate, location.pathname]);
 
-  // 滚动监听
+  // Scroll observer
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
@@ -132,7 +132,7 @@ function Home() {
     };
 
     container.addEventListener('scroll', handleScroll);
-    // 初始检查
+    // Initial position check
     handleScroll();
 
     return () => container.removeEventListener('scroll', handleScroll);
@@ -147,35 +147,35 @@ function Home() {
         if (response.status === 401) {
           handleUnauthorized();
         } else {
-          console.error('加载对话历史失败:', response.error);
+          console.error('Failed to load conversation history:', response.error);
         }
         return;
       }
 
-      // 只加载对话列表，不加载消息
+      // Load conversation list but defer messages
       const conversationsWithoutMessages = response.data.map((conv: ApiConversation) => ({
         id: conv.id,
         title: conv.title,
-        messages: [] as Message[], // 初始为空，按需加载
+        messages: [] as Message[], // Start empty and hydrate on demand
         lastUpdated: new Date(conv.updated_at)
       }));
 
       setConversations(conversationsWithoutMessages);
 
-      // 如果有对话，选择第一个但不自动加载消息
+      // Select the first conversation without loading messages automatically
       if (conversationsWithoutMessages.length > 0) {
         const firstConvId = conversationsWithoutMessages[0].id;
         setCurrentConversation(firstConvId);
-        // 移除自动加载消息，让用户手动点击对话来加载
+        // Allow the user to load messages manually
       }
     } catch (error) {
-      console.error('加载对话历史失败:', error);
+      console.error('Failed to load conversation history:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 新增：按需加载特定对话的消息
+  // Load messages for a specific conversation on demand
   const loadMessagesForConversation = async (conversationId: string) => {
     try {
       const messagesResponse = await apiClient.getMessages(conversationId);
@@ -184,7 +184,7 @@ function Home() {
         if (messagesResponse.status === 401) {
           handleUnauthorized();
         } else {
-          console.error('加载消息失败:', messagesResponse.error);
+          console.error('Failed to load messages:', messagesResponse.error);
         }
         return;
       }
@@ -198,20 +198,20 @@ function Home() {
         is_conversation_root: msg.is_conversation_root ?? false
       }));
 
-      // 更新特定对话的消息
+      // Update the selected conversation with fetched messages
       setConversations(prev => prev.map(conv => 
         conv.id === conversationId 
           ? { ...conv, messages }
           : conv
       ));
     } catch (error) {
-      console.error('加载消息失败:', error);
+      console.error('Failed to load messages:', error);
     }
   };
 
   const currentConv = conversations.find(conv => conv.id === currentConversation);
 
-  // 滚动到底部函数
+  // Smoothly scroll to the bottom of the message list
   const scrollToBottom = () => {
     messagesContainerRef.current?.scrollTo({
       top: messagesContainerRef.current.scrollHeight,
@@ -229,7 +229,7 @@ function Home() {
         if (response.status === 401) {
           handleUnauthorized();
         } else {
-          console.error('创建对话失败:', response.error);
+          console.error('Failed to create conversation:', response.error);
         }
         return;
       }
@@ -245,7 +245,7 @@ function Home() {
       setCurrentConversation(response.data.id);
       setInputMessage('');
 
-      // 自动聚焦到输入框
+      // Auto-focus the input field
       setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
@@ -255,96 +255,96 @@ function Home() {
   };
 
   const handleDeleteConversation = async (conversationId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // 防止触发对话选择
-    
-    // 强制输出到控制台，确保日志可见
-    console.warn('🗑️ [DELETE DEBUG] 删除按钮被点击，对话ID:', conversationId);
-    console.warn('📊 [DELETE DEBUG] 删除前对话列表长度:', conversations.length);
-    console.warn('📋 [DELETE DEBUG] 当前对话列表:', conversations.map(c => ({ id: c.id, title: c.title })));
-    
-    // 使用更可靠的确认机制，处理Electron环境中confirm的异常行为
+    e.stopPropagation(); // Prevent selecting the conversation row
+
+    // Verbose logging to make delete flow traceable
+    console.warn('🗑️ [DELETE DEBUG] Delete button clicked, conversation ID:', conversationId);
+    console.warn('📊 [DELETE DEBUG] Conversation count before delete:', conversations.length);
+    console.warn('📋 [DELETE DEBUG] Conversation list snapshot:', conversations.map(c => ({ id: c.id, title: c.title })));
+
+    // Confirmation helper for environments where confirm might behave differently
     let userConfirmed: boolean;
     try {
-      console.warn('🔍 [DELETE DEBUG] 准备显示确认对话框...');
-      const confirmResult = window.confirm('确定要删除这个对话吗？此操作无法撤销。');
-      console.warn('👤 [DELETE DEBUG] 原始确认结果 (类型:', typeof confirmResult, ', 值:', confirmResult, ')');
-      
-      // 处理Electron环境中confirm可能返回对象的情况
+      console.warn('🔍 [DELETE DEBUG] Opening confirmation dialog...');
+      const confirmResult = window.confirm('Are you sure you want to delete this conversation? This action cannot be undone.');
+      console.warn('👤 [DELETE DEBUG] Raw confirm result (type:', typeof confirmResult, ', value:', confirmResult, ')');
+
+      // Handle cases where confirm returns an object (e.g., some Electron builds)
       if (typeof confirmResult === 'boolean') {
         userConfirmed = confirmResult;
       } else if (typeof confirmResult === 'object' && confirmResult !== null) {
-        // 在某些Electron环境中，confirm可能返回包含结果的对象
+        // Coerce confirm result objects into booleans
         userConfirmed = Boolean((confirmResult as any).result || (confirmResult as any).value || confirmResult);
       } else {
-        // 其他情况转换为boolean
+        // Fallback to boolean cast
         userConfirmed = Boolean(confirmResult);
       }
-      
-      console.warn('👤 [DELETE DEBUG] 处理后的确认结果:', userConfirmed);
+
+      console.warn('👤 [DELETE DEBUG] Normalized confirm result:', userConfirmed);
     } catch (error) {
-      console.error('❌ [DELETE DEBUG] 确认对话框出错:', error);
+      console.error('❌ [DELETE DEBUG] Confirm dialog failed:', error);
       userConfirmed = false;
     }
-    
-    // 严格检查确认结果
+
+    // Respect the confirmation result
     if (!userConfirmed) {
-      console.warn('❌ [DELETE DEBUG] 用户取消删除，停止删除操作');
-      console.warn('📊 [DELETE DEBUG] 取消删除后对话列表长度:', conversations.length);
+      console.warn('❌ [DELETE DEBUG] User canceled deletion; aborting.');
+      console.warn('📊 [DELETE DEBUG] Conversation count unchanged:', conversations.length);
       return;
     }
-    
-    console.warn('✅ [DELETE DEBUG] 用户确认删除，开始执行删除操作...');
-    
+
+    console.warn('✅ [DELETE DEBUG] User confirmed deletion; proceeding...');
+
     try {
-      console.warn('🌐 [DELETE DEBUG] 发送删除请求到服务器...');
-      console.warn('🔗 [DELETE DEBUG] 请求URL: /api/messages/conversations/' + conversationId);
-      
+      console.warn('🌐 [DELETE DEBUG] Sending delete request...');
+      console.warn('🔗 [DELETE DEBUG] Request URL: /api/messages/conversations/' + conversationId);
+
       const response = await apiClient.deleteConversation(conversationId);
-      console.warn('📡 [DELETE DEBUG] 服务器响应:', JSON.stringify(response, null, 2));
-      
+      console.warn('📡 [DELETE DEBUG] Server response:', JSON.stringify(response, null, 2));
+
       if (!response.success) {
         if (response.status === 401) {
           handleUnauthorized();
         } else {
-          console.error('删除对话失败:', response.error);
+          console.error('Failed to delete conversation:', response.error);
         }
         return;
       }
 
-      console.warn('✅ [DELETE DEBUG] 服务器确认删除成功，更新前端状态...');
-      
-      const remainingConversations = conversations.filter(conv => conv.id !== conversationId);
-      console.warn('📊 [DELETE DEBUG] 删除后剩余对话数量:', remainingConversations.length);
-      console.warn('📋 [DELETE DEBUG] 剩余对话列表:', remainingConversations.map(c => ({ id: c.id, title: c.title })));
+      console.warn('✅ [DELETE DEBUG] Deletion succeeded; updating UI...');
 
-      console.warn('🔄 [DELETE DEBUG] 更新本地状态...');
+      const remainingConversations = conversations.filter(conv => conv.id !== conversationId);
+      console.warn('📊 [DELETE DEBUG] Remaining conversation count:', remainingConversations.length);
+      console.warn('📋 [DELETE DEBUG] Remaining conversation list:', remainingConversations.map(c => ({ id: c.id, title: c.title })));
+
+      console.warn('🔄 [DELETE DEBUG] Updating local state...');
       setConversations(remainingConversations);
 
       if (currentConversation === conversationId) {
-        console.warn('🔄 [DELETE DEBUG] 删除的是当前对话，需要切换...');
+        console.warn('🔄 [DELETE DEBUG] Deleted conversation was active; switching...');
         if (remainingConversations.length > 0) {
-          console.warn('➡️ [DELETE DEBUG] 切换到第一个剩余对话:', remainingConversations[0].id);
+          console.warn('➡️ [DELETE DEBUG] Switching to first remaining conversation:', remainingConversations[0].id);
           setCurrentConversation(remainingConversations[0].id);
         } else {
-          console.warn('🆕 [DELETE DEBUG] 没有剩余对话，创建新对话...');
+          console.warn('🆕 [DELETE DEBUG] No conversations left; creating a new one...');
           setCurrentConversation('');
           handleNewChat();
         }
       }
 
-      console.warn('🎉 [DELETE DEBUG] 删除操作完成');
+      console.warn('🎉 [DELETE DEBUG] Delete flow completed');
 
-      console.warn('🔄 [DELETE DEBUG] 重新加载对话列表以确保同步...');
+      console.warn('🔄 [DELETE DEBUG] Reloading conversations to ensure sync...');
       try {
         const conversationsResponse = await apiClient.getConversations();
         if (!conversationsResponse.success || !conversationsResponse.data) {
           if (conversationsResponse.status === 401) {
             handleUnauthorized();
           } else {
-            console.error('重新加载对话列表失败:', conversationsResponse.error);
+            console.error('Failed to reload conversations:', conversationsResponse.error);
           }
         } else {
-          console.warn('📋 [DELETE DEBUG] 从服务器重新加载的对话列表:', conversationsResponse.data.length);
+          console.warn('📋 [DELETE DEBUG] Server conversation count after reload:', conversationsResponse.data.length);
           setConversations(conversationsResponse.data.map(conv => ({
             id: conv.id,
             title: conv.title,
@@ -353,11 +353,11 @@ function Home() {
           })));
         }
       } catch (reloadError) {
-        console.error('❌ [DELETE DEBUG] 重新加载对话列表失败:', reloadError);
+        console.error('❌ [DELETE DEBUG] Failed to reload conversations:', reloadError);
       }
     } catch (error) {
-      console.error('❌ [DELETE DEBUG] 删除对话失败:', error);
-      alert('删除对话失败，请稍后重试。');
+      console.error('❌ [DELETE DEBUG] Delete conversation threw:', error);
+      alert('Failed to delete the conversation. Please try again later.');
     }
   };
 
@@ -537,15 +537,15 @@ function Home() {
       const pollExperimentIdDuringStream = async (attempt = 1, maxAttempts = 5): Promise<void> => {
         if (hasResolvedExperimentId) return;
         try {
-          console.log(`流式响应中检查experiment_id，第${attempt}次尝试`);
+          console.log(`Streaming experiment_id check attempt ${attempt}`);
           const latestExperimentId = await fetchLatestExperimentId();
           if (latestExperimentId) {
-            console.log('✅ 流式响应中获取到experiment_id:', latestExperimentId);
+            console.log('✅ experiment_id acquired mid-stream:', latestExperimentId);
             applyExperimentIdToAssistantMessage(latestExperimentId);
             return;
           }
         } catch (streamError) {
-          console.error('流式响应中获取experiment_id失败:', streamError);
+          console.error('Failed to obtain experiment_id during stream:', streamError);
         }
 
         if (!hasResolvedExperimentId && attempt < maxAttempts) {
@@ -558,15 +558,15 @@ function Home() {
       const pollExperimentIdAfterStream = async (attempt = 1, maxAttempts = 10): Promise<void> => {
         if (hasResolvedExperimentId) return;
         try {
-          console.log(`检查experiment_id，第${attempt}次尝试`);
+          console.log(`Post-stream experiment_id check attempt ${attempt}`);
           const latestExperimentId = await fetchLatestExperimentId();
           if (latestExperimentId) {
-            console.log('✅ 获取到experiment_id:', latestExperimentId);
+            console.log('✅ experiment_id fetched:', latestExperimentId);
             applyExperimentIdToAssistantMessage(latestExperimentId);
             return;
           }
         } catch (error) {
-          console.error('获取experiment_id失败:', error);
+          console.error('Failed to fetch experiment_id:', error);
         }
 
         if (!hasResolvedExperimentId && attempt < maxAttempts) {
@@ -574,7 +574,7 @@ function Home() {
             void pollExperimentIdAfterStream(attempt + 1, maxAttempts);
           }, 1000);
         } else if (!hasResolvedExperimentId) {
-          console.warn('⚠️ 达到最大重试次数，仍未获取到experiment_id');
+          console.warn('⚠️ Max retries reached without resolving experiment_id');
         }
       };
 
@@ -586,7 +586,7 @@ function Home() {
           return;
         }
         hasStartedExperimentIdCheck = true;
-        console.log('🔧 收到用户输入后立即开始检查experiment_id');
+        console.log('🔧 Starting experiment_id polling right after user input');
         setTimeout(() => {
           void pollExperimentIdDuringStream();
         }, 1000);
@@ -657,7 +657,7 @@ function Home() {
         scrollToBottom();
       }, 100);
     } catch (error) {
-      console.error('生成实验失败:', error);
+      console.error('Failed to generate experiment:', error);
       const errorContent = `Sorry, an error occurred while generating the response: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again later.`;
       
       if (activeConversationId) {
@@ -699,13 +699,13 @@ function Home() {
     }
   };
 
-  // 检查当前对话是否有消息
+  // Determine whether the active conversation already has messages
   const hasMessages = currentConversation && 
     conversations.find(c => c.id === currentConversation)?.messages.length > 0;
 
   return (
     <div className="h-screen flex relative" style={{ backgroundColor: '#2D3748' }}>
-      {/* 鼠标悬停触发区域 - 左侧1/7宽度，只在边栏关闭时显示 */}
+      {/* Hover target to reveal the sidebar when it is collapsed */}
       {!isSidebarOpen && (
         <div 
           className="fixed left-0 top-0 h-full z-30"
@@ -714,7 +714,7 @@ function Home() {
         />
       )}
 
-      {/* 聊天历史边栏 - 使用1/7的屏幕宽度 */}
+      {/* Conversation sidebar occupying roughly one-sixth of the viewport */}
       <div 
         className={`fixed left-1 top-1 bottom-1 bg-dark-bg-secondary border border-dark-border rounded-lg shadow-2xl z-20 transition-transform duration-300 ease-in-out overflow-y-auto sidebar-scroll ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-[calc(100%+0.25rem)]'
@@ -738,7 +738,7 @@ function Home() {
               key={conv.id}
               onClick={() => {
                 setCurrentConversation(conv.id);
-                // 如果该对话还没有加载消息，则加载消息
+                // Load messages the first time this conversation is opened
                 if (conv.messages.length === 0) {
                   loadMessagesForConversation(conv.id);
                 }
@@ -770,7 +770,7 @@ function Home() {
         </div>
       </div>
 
-      {/* 主内容区域 */}
+      {/* Primary content area */}
       <div className="flex-1 flex flex-col relative">
         <div className="absolute top-4 right-4 sm:right-6 z-20">
           <div className="flex items-center gap-3 px-4 py-2 bg-dark-bg-secondary border border-dark-border rounded-full shadow-lg">
@@ -781,19 +781,19 @@ function Home() {
               onClick={handleLogout}
               className="px-3 py-1.5 rounded-full bg-dark-bg-tertiary border border-dark-border text-dark-text hover:bg-dark-bg-secondary transition-colors"
             >
-              退出
+              Log out
             </button>
           </div>
         </div>
 
-        {/* 消息区域 */}
+        {/* Message stream */}
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 pt-24 pb-32 relative">
           {!isLoading && currentConversation && conversations.find(c => c.id === currentConversation) ? (
             <div className="max-w-4xl mx-auto space-y-4">
-              {/* 只在没有消息时显示大标题和Light Rays背景 */}
+              {/* Display the hero state only while the conversation is empty */}
               {conversations.find(c => c.id === currentConversation)?.messages.length === 0 && (
                 <div className="flex-1 flex justify-center relative" style={{ paddingTop: 'calc(33.33vh - 2rem)' }}>
-                  {/* Light Rays 背景 */}
+                  {/* Light rays background */}
                   <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1 }}>
                     <LightRays 
                       raysOrigin="top-center" 
@@ -871,7 +871,7 @@ function Home() {
                           )}
                         </div>
 
-                        {/* 如果消息有实验ID且不在流式响应中，显示查看演示按钮 */}
+                        {/* Show the demo button when the assistant returned an experiment ID */}
                         {message.experiment_id && streamingMessageId !== message.id && (
                           <div className="mt-4 pt-3 border-t border-dark-border">
                             <button
@@ -898,7 +898,7 @@ function Home() {
             </div>
           ) : (
             <div className="flex-1 flex justify-center relative" style={{ paddingTop: 'calc(33.33vh - 2rem)' }}>
-              {/* Light Rays 背景 */}
+              {/* Light rays background */}
               <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1 }}>
                 <LightRays 
                   raysOrigin="top-center" 
@@ -917,7 +917,7 @@ function Home() {
             </div>
           )}
           
-          {/* 滚动到底部按钮 */}
+          {/* Scroll-to-bottom shortcut */}
           {showScrollToBottom && (
             <button
               onClick={scrollToBottom}
@@ -929,10 +929,10 @@ function Home() {
           )}
         </div>
 
-        {/* 输入区域 */}
+        {/* Input section */}
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-10 w-3/5">
           <div className="bg-dark-bg-secondary border border-dark-border rounded-3xl shadow-2xl p-3 w-full">
-            {/* 输入和发送区域 */}
+            {/* Compose and send controls */}
             <div className="flex gap-2">
               <div className="flex-1 relative">
                 <input
@@ -977,7 +977,7 @@ function Home() {
         </div>
       </div>
       
-      {/* Donation Button - 只在主页显示 */}
+      {/* Donation button is only visible on the home page */}
       <DonationButton />
       
       {/* Survey Modal */}

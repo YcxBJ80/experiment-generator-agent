@@ -649,7 +649,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: ExpressResp
       });
     }
 
-    // 对于用户消息，content不能为空
+    // User messages must always include content
     if (type === 'user' && !content) {
       return res.status(400).json({
         success: false,
@@ -664,7 +664,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: ExpressResp
       });
     }
 
-    // 创建消息
+    // Persist the message
     const message = await DatabaseService.createMessage({
       conversation_id,
       content,
@@ -751,7 +751,7 @@ router.get('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
     const { id } = req.params;
     console.log(`🔍 Getting experiment details, ID: ${id}`);
     
-    // 从数据库获取实验数据
+    // Retrieve experiment data from the database
     const experiment = await DatabaseService.getExperimentById(id);
     
     if (!experiment) {
@@ -764,15 +764,15 @@ router.get('/:id', async (req: ExpressRequest, res: ExpressResponse) => {
 
     console.log(`✅ Found experiment, ID: ${id}`);
     
-    // 返回实验数据
+    // Return the experiment payload
     res.json({
       success: true,
       data: {
         experiment_id: experiment.id,
         title: experiment.title || 'Experiment Demo',
         html_content: experiment.html_content || '',
-        css_content: '', // 从html_content中提取或留空
-        js_content: ''   // 从html_content中提取或留空
+        css_content: '', // Extract from html_content or leave empty
+        js_content: ''   // Extract from html_content or leave empty
       }
     });
 

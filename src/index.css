@@ -27,12 +27,12 @@ body {
   font-family: 'Inter', sans-serif;
 }
 
-/* 代码字体 */
+/* Monospaced font */
 .font-mono {
   font-family: 'Fira Code', monospace;
 }
 
-/* 自定义滚动条 */
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -50,7 +50,7 @@ body {
   background: #3a3a3a;
 }
 
-/* 侧边栏滚动条样式 - 保持圆角 */
+/* Sidebar scrollbar styling with rounded corners */
 .sidebar-scroll {
   scrollbar-width: thin;
   scrollbar-color: #2a2a2a transparent;

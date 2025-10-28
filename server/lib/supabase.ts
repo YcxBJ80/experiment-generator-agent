@@ -366,7 +366,7 @@ export class DatabaseService {
         return null;
       }
 
-      // 取第一条记录
+      // Use the first matching record
       const experiment = data[0];
       
       return {

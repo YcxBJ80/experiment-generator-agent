@@ -4,7 +4,7 @@ const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { ListToolsRequestSchema, CallToolRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 
-// 创建 MCP 服务器
+// Create the MCP server
 const server = new Server(
   {
     name: 'perplexity-mcp-server',
@@ -17,7 +17,7 @@ const server = new Server(
   }
 );
 
-// 定义工具列表
+// Define the tool list
 const tools = [
   {
     name: 'search',
@@ -122,14 +122,14 @@ const tools = [
   }
 ];
 
-// 处理工具列表请求
+// Handle list-tools requests
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: tools
   };
 });
 
-// 处理工具调用
+// Handle tool invocations
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   
@@ -140,7 +140,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `模拟搜索结果：关于"${args.query}"的${args.response_type || 'normal'}级别信息。这是一个模拟的Perplexity搜索结果，包含了相关的研究信息和数据。在实际实现中，这里会调用真实的Perplexity API或网页自动化来获取搜索结果。`
+              text: `Simulated search result: ${args.response_type || 'normal'}-detail information about "${args.query}". This placeholder Perplexity response includes representative research highlights and data. A production implementation would call the real Perplexity API or automate the browser to gather results.`
             }
           ]
         };
@@ -150,7 +150,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `模拟文档获取：关于"${args.technology}"的技术文档。${args.context ? `上下文：${args.context}。` : ''}这是一个模拟的文档获取结果，包含了技术规范、使用示例和最佳实践。在实际实现中，这里会通过Perplexity获取最新的技术文档。`
+              text: `Simulated documentation lookup: technical references for "${args.technology}".${args.context ? ` Context: ${args.context}.` : ''} This mock response surfaces specifications, examples, and best practices. A real integration would query Perplexity for the latest documentation.`
             }
           ]
         };
@@ -160,7 +160,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `模拟API查找：根据需求"${args.requirements}"找到的相关API。${args.context ? `上下文：${args.context}。` : ''}这是一个模拟的API查找结果，包含了推荐的API列表、使用方法和集成指南。`
+              text: `Simulated API discovery: APIs related to the requirement "${args.requirements}".${args.context ? ` Context: ${args.context}.` : ''} This placeholder result lists recommended APIs with usage notes and integration tips.`
             }
           ]
         };
@@ -170,7 +170,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `模拟代码检查：分析"${args.technology}"技术栈中的代码片段。检测到的废弃模式和建议的替代方案。这是一个模拟的代码分析结果。`
+              text: `Simulated code review: analysing snippets from the "${args.technology}" stack, highlighting deprecated patterns and suggesting alternatives. This is purely a mock analysis.`
             }
           ]
         };
@@ -180,7 +180,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `模拟内容提取：从URL "${args.url}" 提取的内容摘要。递归深度：${args.depth || 1}。这是一个模拟的内容提取结果，包含了网页的主要文本内容和元数据。`
+              text: `Simulated content extraction: summary of material from "${args.url}". Crawl depth: ${args.depth || 1}. This mock response captures representative page text and metadata.`
             }
           ]
         };
@@ -193,7 +193,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: 'text',
               text: JSON.stringify({
                 chat_id: chatId,
-                response: `模拟Perplexity对话回复：关于"${args.message}"的智能回答。这是一个持续的对话会话，ID为${chatId}。`
+                response: `Simulated Perplexity reply: intelligent response about "${args.message}". This keeps the ongoing conversation alive under ID ${chatId}.`
               })
             }
           ]
@@ -207,7 +207,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
-// 启动服务器
+// Start the server
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
