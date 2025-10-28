@@ -30,5 +30,5 @@
 - Ensure lint, type check, and critical integration scripts succeed before requesting review, and note any intentionally skipped tests.
 
 ## Environment & Configuration
-- Store secrets in `.env.local` files excluded from version control; see `ENV_SETUP.md` for required keys.
-- When adjusting third-party credentials (Supabase, OpenAI, Perplexity), update the matching docs in `API_FIX_SUMMARY.md` to keep agents aligned.
+- Store secrets in `.env.local` files excluded from version control; see `docs/getting-started.md` for required keys.
+- When adjusting third-party credentials (Supabase, OpenAI, Perplexity), update the matching notes in `docs/operations/api-fix-history.md` to keep agents aligned.

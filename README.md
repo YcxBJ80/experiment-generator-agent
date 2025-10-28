@@ -1,241 +1,79 @@
-# 🚀 AI Interactive Experiment Platform
+# Experiment Visualizer
 
-> An AI-powered interactive experiment generation platform with Perplexity MCP integration for real-time knowledge retrieval and intelligent code generation
+An AI-assisted platform that turns natural language prompts into interactive HTML/CSS/JS experiments. The project couples a Vite + React client with an Express + Supabase backend and integrates OpenRouter (GPT-compatible) models plus a Perplexity MCP bridge.
 
-## 📖 Project Overview
+## At a glance
 
-This is an innovative AI-driven platform that allows users to generate interactive HTML/CSS/JavaScript experiments through natural language descriptions. The platform integrates OpenAI GPT models and Perplexity MCP client to retrieve real-time knowledge and generate high-quality interactive content.
+- **Conversational experiment builder** – chat with the assistant to generate runnable experiments.
+- **Streaming UX** – Server-Sent Events (SSE) pipe responses to the UI in real time.
+- **Supabase persistence** – conversations, experiments, and surveys live in Postgres.
+- **Perplexity integration** – MCP bridge ready for live knowledge retrieval.
 
-### 🎯 Core Features
-
-- **Intelligent Conversation Generation**: Natural language interaction powered by OpenAI GPT
-- **Real-time Knowledge Retrieval**: Integrated Perplexity MCP protocol for latest information
-- **Interactive Experiment Generation**: Automatically generates runnable HTML/CSS/JavaScript code
-- **Code Quality Assurance**: Automatic JavaScript syntax validation and repair
-- **Streaming Response**: Real-time display of generation process for enhanced user experience
-
-## 🛠️ Technology Stack
-
-### Frontend Technologies
-- **React 18** - Modern frontend framework
-- **TypeScript** - Type-safe JavaScript
-- **Vite** - Fast build tool
-- **Tailwind CSS** - Utility-first CSS framework
-- **Lucide React** - Modern icon library
-- **React Router DOM** - Client-side routing
-- **Zustand** - Lightweight state management
-
-### Backend Technologies
-- **Node.js** - JavaScript runtime
-- **Express.js** - Web application framework
-- **TypeScript** - Server-side type safety
-- **Nodemon** - Auto-restart during development
-- **CORS** - Cross-origin resource sharing
-
-### Database & Storage
-- **Supabase** - Open-source Firebase alternative
-- **PostgreSQL** - Relational database (via Supabase)
-
-### AI Integration
-- **OpenAI API** - GPT model integration
-- **Model Context Protocol (MCP)** - AI model context protocol
-- **Perplexity MCP Client** - Real-time knowledge retrieval
-
-### Development Tools
-- **ESLint** - Code quality checking
-- **Concurrently** - Run multiple commands in parallel
-- **Zod** - Runtime type validation
-
-## 🏗️ System Architecture
+## Repository structure
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   React Frontend│    │   Express Backend│    │  Perplexity     │
-│   TypeScript    │◄──►│   TypeScript     │◄──►│  MCP Client     │
-│   Tailwind CSS │    │   Node.js        │    │  Knowledge API  │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌──────────────────┐
-                       │   OpenAI API     │
-                       │   GPT Models     │
-                       └──────────────────┘
-                                │
-                                ▼
-                       ┌──────────────────┐
-                       │   Supabase       │
-                       │   PostgreSQL     │
-                       └──────────────────┘
+.
+├── api/                   # Express bootstrap (middleware, app factory)
+├── server/                # Routes, services, Supabase helpers
+├── src/                   # Vite React client (pages, hooks, components, lib, assets)
+├── docs/                  # Documentation hub (see docs/README.md)
+│   ├── getting-started.md
+│   ├── architecture.md
+│   ├── guides/            # Streaming deep-dives
+│   ├── operations/        # Incident history
+│   └── wiki/              # Ready-to-publish GitHub wiki pages
+├── perplexity-mcp-zerver/ # Model Context Protocol bridge (Node CLI)
+├── supabase/              # Database migrations
+└── test-*.js              # Integration harnesses
 ```
 
-## 🚀 Quick Start
+## Getting started
 
-### Prerequisites
+1. **Install dependencies**
+   ```bash
+   pnpm install   # or npm install
+   ```
+2. **Configure environment variables** – create `.env` in the repo root using [`docs/getting-started.md`](docs/getting-started.md) as a template.
+3. **Apply Supabase migrations**
+   ```bash
+   supabase db push
+   ```
+4. **Run the stack**
+   ```bash
+   pnpm dev          # frontend + backend
+   # or
+   pnpm client:dev   # http://localhost:5173
+   pnpm server:dev   # http://localhost:3001
+   ```
 
-- **Node.js** 18.0 or higher
-- **pnpm** (recommended) or npm
-- **Supabase** account
-- **OpenAI API** key
+## Development workflow
 
-### Installation Steps
+| Task | Command |
+| ---- | ------- |
+| Type checking | `pnpm check` |
+| Linting | `pnpm lint` |
+| Build production bundle | `pnpm build` |
+| Preview production build | `pnpm preview` |
+| Run integration harness (after API is up) | `node test-complete-integration.js` |
 
-1. **Clone the repository**
-```bash
-git clone https://github.com/your-username/hackathone2.git
-cd hackathone2
-```
+## Documentation map
 
-2. **Install dependencies**
-```bash
-# Using pnpm (recommended)
-pnpm install
+- **Docs hub:** [`docs/README.md`](docs/README.md)
+- **Setup guide:** [`docs/getting-started.md`](docs/getting-started.md)
+- **Architecture overview:** [`docs/architecture.md`](docs/architecture.md)
+- **Streaming internals:** [`docs/guides/`](docs/guides)
+- **Operational history:** [`docs/operations/api-fix-history.md`](docs/operations/api-fix-history.md)
+- **Wiki drafts:** [`docs/wiki/`](docs/wiki)
 
-# Or using npm
-npm install
-```
+## Conventions
 
-3. **Environment setup**
-```bash
-# Copy environment template
-cp .env.example .env
+- **TypeScript + ESLint** – keep code lint-clean and type-safe.
+- **Tailwind + utility-first styling** – follow existing patterns in `src/pages` and `src/components`.
+- **Conventional Commits** – use prefixes like `feat:`, `fix:`, `chore:` when committing.
+- **Security** – store secrets in `.env.local` variants that are already gitignored.
 
-# Edit .env file with your API keys
-```
+## Need help?
 
-**Environment variables explanation:**
-```env
-# OpenRouter API Configuration
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_BASE_URL=https://openrouter.ai/api/v1
-
-# Server Configuration
-PORT=8769
-
-# Supabase Configuration
-SUPABASE_URL=your_supabase_url_here
-SUPABASE_ANON_KEY=your_supabase_anon_key_here
-```
-
-4. **Database setup**
-
-Use the Supabase CLI to apply the migrations shipped with this repository:
-
-```bash
-supabase db push
-```
-
-This command creates all required tables (including `messages`, `surveys`, and `user_profiles`), indexes, and triggers. If you already ran an earlier migration that removed `user_profiles`, ensure you apply the latest migrations so the table is restored.
-
-5. **Start development servers**
-```bash
-# Start both frontend and backend
-pnpm dev
-
-# Or start separately
-pnpm client:dev  # Frontend: http://localhost:5173
-pnpm server:dev  # Backend: http://localhost:8769
-```
-
-## 📱 Usage Guide
-
-### Basic Usage Flow
-
-1. **Access the app**: Open your browser and visit `http://localhost:5173`
-2. **Start conversation**: Describe the experiment or functionality you want in the input box
-3. **View generation**: AI will generate responses and interactive experiments in real-time
-4. **Experience experiments**: Click the "View Interactive Demo" button to experience generated experiments
-5. **Continue conversation**: You can continue asking questions or request modifications
-
-### Example Prompts
-
-```
-Create a simple calculator with basic arithmetic operations
-
-Make a colorful particle animation effect
-
-Create a todo list that can add, delete, and mark items as complete
-
-Design a responsive card layout showcase
-```
-
-## 🔧 API Endpoints
-
-### Conversation Management
-- `POST /api/conversations` - Create new conversation
-- `GET /api/conversations/:id/messages` - Get conversation messages
-
-### Message Processing
-- `POST /api/messages` - Send message (supports streaming response)
-- `GET /api/messages/:id` - Get specific message
-
-### Experiment Management
-- `POST /api/experiments/generate` - Generate experiment
-- `GET /api/experiments/:id` - Get experiment details
-
-## 🧪 Development & Testing
-
-### Code Quality Checks
-```bash
-# TypeScript type checking
-pnpm check
-
-# ESLint code quality check
-pnpm lint
-```
-
-### Build Project
-```bash
-# Build production version
-pnpm build
-
-# Preview build result
-pnpm preview
-```
-
-## 📦 Deployment
-
-### Vercel Deployment
-
-1. **Install Vercel CLI**
-```bash
-npm i -g vercel
-```
-
-2. **Deploy to Vercel**
-```bash
-vercel --prod
-```
-
-3. **Configure environment variables**
-Set the same environment variables in the Vercel console.
-
-### Other Deployment Platforms
-
-The project supports deployment to any Node.js-compatible platform, such as:
-- **Netlify**
-- **Railway**
-- **Render**
-- **Heroku**
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Create a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **OpenAI** - For providing powerful GPT models
-- **Perplexity AI** - For real-time knowledge retrieval services
-- **Supabase** - For modern database solutions
-- **Vercel** - For excellent deployment platform
-
----
-
-**Built with ❤️ - Showcasing the future of AI-driven interactive content generation!**
+- Check the documentation hub for deeper dives.
+- Ask the assistant to generate experiments, then open `/demo/:id` to preview them in a sandboxed iframe.
+- If streaming behaves oddly, run through the checklist at [`docs/guides/streaming-render-check.md`](docs/guides/streaming-render-check.md).***
