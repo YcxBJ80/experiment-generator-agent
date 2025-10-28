@@ -406,7 +406,7 @@ router.post('/generate-stream', requireAuth, async (req: AuthenticatedRequest, r
 
     const { prompt, conversation_id, message_id, model }: GenerateExperimentRequest & { message_id?: string } = req.body;
     
-    const selectedModel = model || 'openrouter/andromeda-alpha';
+    const selectedModel = model || 'openai/gpt-5';
 
     if (!prompt) {
       return res.status(400).json({

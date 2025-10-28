@@ -48,7 +48,7 @@ function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('openai/gpt-5-mini');
+  const [selectedModel, setSelectedModel] = useState('openai/gpt-5');
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -91,10 +91,11 @@ function Home() {
 
   // 可选择的模型列表
   const availableModels = [
-    { id: 'moonshotai/kimi-k2', name: 'Kimi K2' },
-    { id: 'qwen/qwen3-coder', name: 'Qwen3 Coder' },
     { id: 'openai/gpt-5', name: 'GPT-5' },
     { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini' },
+    { id: 'anthropic/claude-haiku-4.5', name: 'Claude Haiku 4.5' },
+    { id: 'moonshotai/kimi-k2', name: 'Kimi K2' },
+    { id: 'qwen/qwen3-coder', name: 'Qwen3 Coder' },
   ];
 
   // 加载对话历史

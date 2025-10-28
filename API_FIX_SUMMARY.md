@@ -26,7 +26,7 @@ args: ['/Users/yangchengxuan/Desktop/PROJECTS/Experiment Visualizer/experiment-g
 1. 创建了环境变量配置指南 `ENV_SETUP.md`，说明如何配置 `.env` 文件。
 2. 创建了测试脚本 `test-openai-config.js` 用于验证API配置。
 3. 发现OpenAI在您所在的地区不支持，因此需要使用OpenRouter。
-4. 修改了 `api/routes/messages.ts` 文件中的默认模型名称，从 `openai/gpt-5-mini` 更改为 `openrouter/andromeda-alpha`。
+4. 修改了 `api/routes/messages.ts` 文件中的默认模型名称，当前默认使用 `openai/gpt-5`。
 
 ## 环境变量配置
 
