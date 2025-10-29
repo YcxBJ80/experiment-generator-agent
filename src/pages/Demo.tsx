@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { apiClient, type ExperimentData } from '@/lib/api';
@@ -118,6 +118,9 @@ const buildIframeContent = (experiment: ExperimentDisplayData) => {
 export default function Demo() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const navigationState = location.state as { conversationId?: string } | null;
+  const conversationId = navigationState?.conversationId ?? null;
   const [experiment, setExperiment] = useState<ExperimentDisplayData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -135,14 +138,16 @@ export default function Demo() {
           const experimentData: ExperimentData = JSON.parse(localData);
           const displayData: ExperimentDisplayData = {
             id: experimentData.experiment_id,
-            title: 'Experiment Demo', // Can extract title from experiment content
+            title: experimentData.title ?? 'Experiment Demo',
             htmlContent: experimentData.html_content,
             cssContent: experimentData.css_content,
             jsContent: experimentData.js_content
           };
-          setExperiment(displayData);
-          setLoading(false);
-          return;
+          if (displayData.htmlContent && displayData.htmlContent.trim().length > 0) {
+            setExperiment(displayData);
+            setLoading(false);
+            return;
+          }
         }
 
         // If not in localStorage, try to get from API
@@ -150,12 +155,32 @@ export default function Demo() {
         if (response.success && response.data) {
           const displayData: ExperimentDisplayData = {
             id: response.data.experiment_id,
-            title: 'Experiment Demo',
+            title: response.data.title ?? 'Experiment Demo',
             htmlContent: response.data.html_content,
             cssContent: response.data.css_content,
             jsContent: response.data.js_content
           };
+          if (!displayData.htmlContent || displayData.htmlContent.trim().length === 0) {
+            throw new Error('Experiment payload did not include HTML content');
+          }
           setExperiment(displayData);
+
+          try {
+            localStorage.setItem(
+              `experiment_${displayData.id}`,
+              JSON.stringify({
+                experiment_id: displayData.id,
+                title: displayData.title,
+                html_content: displayData.htmlContent,
+                css_content: displayData.cssContent,
+                js_content: displayData.jsContent,
+                status: response.data.status ?? 'generated',
+                parameters: response.data.parameters ?? []
+              })
+            );
+          } catch (storageError) {
+            console.warn('Failed to cache experiment locally:', storageError);
+          }
         } else {
           throw new Error(response.error || 'Failed to fetch experiment data');
         }
@@ -182,7 +207,19 @@ export default function Demo() {
   }, [experiment]);
 
   const handleGoBack = () => {
-    navigate('/app', { state: { showSurvey: true, experimentId: id } });
+    const nextState: { showSurvey: boolean; experimentId?: string; conversationId?: string } = {
+      showSurvey: true
+    };
+
+    if (id) {
+      nextState.experimentId = id;
+    }
+
+    if (conversationId) {
+      nextState.conversationId = conversationId;
+    }
+
+    navigate('/app', { state: nextState });
   };
 
   if (loading) {

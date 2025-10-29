@@ -9,6 +9,7 @@ import { perplexityMCPClient } from '../lib/perplexityMcpClient.js';
 import { JavaScriptValidator } from '../lib/jsValidator.js';
 import { DatabaseService, type Message as DbMessage } from '../lib/supabase.js';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth.js';
+import { extractExperimentHtml } from '../lib/htmlUtils.js';
 
 // Ensure environment variables are loaded
 const __filename = fileURLToPath(import.meta.url);
@@ -548,38 +549,36 @@ router.post('/generate-stream', requireAuth, async (req: AuthenticatedRequest, r
           if (mode === 'experiment') {
             try {
               console.log('🔧 Processing experiment output and updating message...');
-              
-              const htmlMatch = fullContent.match(/```html\s*([\s\S]*?)\s*```/);
-              if (htmlMatch) {
-                const htmlContent = htmlMatch[1].trim();
-                const resolvedExperimentId = experimentId ?? randomUUID();
-                if (!experimentId) {
-                  console.warn('⚠️ Experiment ID was not set before streaming; generated fallback ID:', resolvedExperimentId);
-                }
-                
-                const titleMatch = htmlContent.match(/<title>(.*?)<\/title>/i);
-                const title = titleMatch ? titleMatch[1] : 'Experiment Demo';
-                
-                await DatabaseService.updateMessage(
-                  message_id,
-                  {
-                    content: fullContent,
-                    experiment_id: resolvedExperimentId,
-                    html_content: htmlContent
-                  },
-                  userId
+              const { html: extractedHtml, title: extractedTitle } = extractExperimentHtml(fullContent);
+              const resolvedExperimentId = experimentId ?? randomUUID();
+              if (!experimentId) {
+                console.warn('⚠️ Experiment ID was not set before streaming; generated fallback ID:', resolvedExperimentId);
+              }
+
+              const updatePayload: Record<string, unknown> = {
+                content: fullContent,
+                experiment_id: resolvedExperimentId
+              };
+
+              if (extractedHtml) {
+                updatePayload.html_content = extractedHtml;
+              }
+
+              await DatabaseService.updateMessage(
+                message_id,
+                updatePayload,
+                userId
+              );
+
+              if (extractedHtml) {
+                console.log(
+                  '✅ Message updated with experiment_id:',
+                  resolvedExperimentId,
+                  'Title:',
+                  extractedTitle || 'Experiment Demo'
                 );
-                
-                console.log('✅ Message updated with experiment_id:', resolvedExperimentId, 'Title:', title);
               } else {
-                console.warn('⚠️ Failed to extract HTML code block from generated content');
-                await DatabaseService.updateMessage(
-                  message_id,
-                  {
-                    content: fullContent
-                  },
-                  userId
-                );
+                console.warn('⚠️ Experiment response did not include an extractable HTML block');
               }
             } catch (error) {
               console.error('❌ Error processing experiment data or updating message:', error);

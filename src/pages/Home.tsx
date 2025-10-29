@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, Send, Play, Plus, Trash2, ChevronDown } from 'lucide-react';
-import { apiClient, type ExperimentData, type Conversation as ApiConversation, type Message as ApiMessage } from '@/lib/api';
+import { apiClient, type Conversation as ApiConversation, type Message as ApiMessage } from '@/lib/api';
 import { useAuth, useAuthActions } from '@/hooks/useAuth';
 import LightRays from '../components/LightRays';
 import DonationButton from '../components/DonationButton';
@@ -44,6 +44,7 @@ function Home() {
   const { clearAuth } = useAuthActions();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<string>('');
+  const [pendingConversationId, setPendingConversationId] = useState<string | null>(null);
   const [inputMessage, setInputMessage] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,10 +69,10 @@ function Home() {
     return firstChar ? firstChar.toUpperCase() : 'U';
   }, [user?.username, user?.email]);
 
-  const handleUnauthorized = () => {
+  const handleUnauthorized = useCallback(() => {
     clearAuth();
     navigate('/login', { replace: true });
-  };
+  }, [clearAuth, navigate]);
 
   const handleLogout = async () => {
     try {
@@ -86,11 +87,39 @@ function Home() {
 
   const markdownRemarkPlugins = useMemo(() => [remarkGfm, remarkMath, remarkBreaks], []);
   const markdownRehypePlugins = useMemo(() => [rehypeRaw, rehypeKatex], []);
+  type MarkdownElementProps = { node?: unknown; children?: ReactNode } & Record<string, unknown>;
+
   const markdownComponents = useMemo(
     () => ({
       a: ({ node, ...props }: { node?: unknown; href?: string; children?: ReactNode }) => (
         <a {...props} target="_blank" rel="noreferrer" />
       ),
+      parameter: ({ node, children, className, ...props }: MarkdownElementProps) => {
+        const mergedClassName = [
+          'bg-dark-bg-tertiary text-dark-text px-1 py-0.5 rounded',
+          typeof className === 'string' ? className : ''
+        ]
+          .filter(Boolean)
+          .join(' ');
+        return (
+          <code className={mergedClassName} {...props}>
+            {children}
+          </code>
+        );
+      },
+      invoke: ({ node, children, className, ...props }: MarkdownElementProps) => {
+        const mergedClassName = [
+          'bg-dark-bg-tertiary text-dark-text px-1 py-0.5 rounded',
+          typeof className === 'string' ? className : ''
+        ]
+          .filter(Boolean)
+          .join(' ');
+        return (
+          <code className={mergedClassName} {...props}>
+            {children}
+          </code>
+        );
+      }
     }),
     []
   );
@@ -104,79 +133,8 @@ function Home() {
     { id: 'qwen/qwen3-coder', name: 'Qwen3 Coder' },
   ];
 
-  // Load conversation list
-  useEffect(() => {
-    loadConversations();
-  }, []);
-
-  // Handle survey trigger passed from the demo page
-  useEffect(() => {
-    const state = location.state as { showSurvey?: boolean; experimentId?: string } | null;
-    if (state?.showSurvey && state?.experimentId) {
-      setShowSurveyModal(true);
-      setSurveyExperimentId(state.experimentId);
-      // Clear location state to avoid repeated triggers
-      navigate(location.pathname, { replace: true });
-    }
-  }, [location.state, navigate, location.pathname]);
-
-  // Scroll observer
-  useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container;
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-      setShowScrollToBottom(!isNearBottom && scrollHeight > clientHeight);
-    };
-
-    container.addEventListener('scroll', handleScroll);
-    // Initial position check
-    handleScroll();
-
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [currentConversation, conversations]);
-
-  const loadConversations = async () => {
-    try {
-      setIsLoading(true);
-      const response = await apiClient.getConversations();
-
-      if (!response.success || !response.data) {
-        if (response.status === 401) {
-          handleUnauthorized();
-        } else {
-          console.error('Failed to load conversation history:', response.error);
-        }
-        return;
-      }
-
-      // Load conversation list but defer messages
-      const conversationsWithoutMessages = response.data.map((conv: ApiConversation) => ({
-        id: conv.id,
-        title: conv.title,
-        messages: [] as Message[], // Start empty and hydrate on demand
-        lastUpdated: new Date(conv.updated_at)
-      }));
-
-      setConversations(conversationsWithoutMessages);
-
-      // Select the first conversation without loading messages automatically
-      if (conversationsWithoutMessages.length > 0) {
-        const firstConvId = conversationsWithoutMessages[0].id;
-        setCurrentConversation(firstConvId);
-        // Allow the user to load messages manually
-      }
-    } catch (error) {
-      console.error('Failed to load conversation history:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Load messages for a specific conversation on demand
-  const loadMessagesForConversation = async (conversationId: string) => {
+  const loadMessagesForConversation = useCallback(async (conversationId: string) => {
     try {
       const messagesResponse = await apiClient.getMessages(conversationId);
 
@@ -199,17 +157,107 @@ function Home() {
       }));
 
       // Update the selected conversation with fetched messages
-      setConversations(prev => prev.map(conv => 
-        conv.id === conversationId 
-          ? { ...conv, messages }
-          : conv
-      ));
+      setConversations(prev => {
+        if (!prev.some(conv => conv.id === conversationId)) {
+          return prev;
+        }
+        return prev.map(conv => 
+          conv.id === conversationId 
+            ? { ...conv, messages }
+            : conv
+        );
+      });
     } catch (error) {
       console.error('Failed to load messages:', error);
     }
-  };
+  }, [handleUnauthorized]);
 
-  const currentConv = conversations.find(conv => conv.id === currentConversation);
+  const loadConversations = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await apiClient.getConversations();
+
+      if (!response.success || !response.data) {
+        if (response.status === 401) {
+          handleUnauthorized();
+        } else {
+          console.error('Failed to load conversation history:', response.error);
+        }
+        return;
+      }
+
+      // Load conversation list but defer messages until needed
+      const conversationsWithoutMessages = response.data.map((conv: ApiConversation) => ({
+        id: conv.id,
+        title: conv.title,
+        messages: [] as Message[], // Start empty and hydrate on demand
+        lastUpdated: new Date(conv.updated_at)
+      }));
+
+      setConversations(conversationsWithoutMessages);
+
+      if (conversationsWithoutMessages.length > 0) {
+        const preferredConversationId =
+          pendingConversationId && conversationsWithoutMessages.some(conv => conv.id === pendingConversationId)
+            ? pendingConversationId
+            : conversationsWithoutMessages[0].id;
+
+        setCurrentConversation(preferredConversationId);
+        await loadMessagesForConversation(preferredConversationId);
+        if (pendingConversationId) {
+          setPendingConversationId(null);
+        }
+      } else {
+        setCurrentConversation('');
+      }
+    } catch (error) {
+      console.error('Failed to load conversation history:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [handleUnauthorized, loadMessagesForConversation, pendingConversationId]);
+
+  // Handle survey trigger and conversation focus passed from the demo page
+  useEffect(() => {
+    const state = location.state as { showSurvey?: boolean; experimentId?: string; conversationId?: string } | null;
+    if (!state) {
+      return;
+    }
+
+    if (state.conversationId) {
+      setPendingConversationId(state.conversationId);
+    }
+
+    if (state.showSurvey && state.experimentId) {
+      setShowSurveyModal(true);
+      setSurveyExperimentId(state.experimentId);
+    }
+
+    navigate(location.pathname, { replace: true, state: undefined });
+  }, [location.pathname, location.state, navigate]);
+
+  // Load conversation list
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  // Scroll observer
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowScrollToBottom(!isNearBottom && scrollHeight > clientHeight);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    // Initial position check
+    handleScroll();
+
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [currentConversation, conversations]);
 
   // Smoothly scroll to the bottom of the message list
   const scrollToBottom = () => {
@@ -699,10 +747,6 @@ function Home() {
     }
   };
 
-  // Determine whether the active conversation already has messages
-  const hasMessages = currentConversation && 
-    conversations.find(c => c.id === currentConversation)?.messages.length > 0;
-
   return (
     <div className="h-screen flex relative" style={{ backgroundColor: '#2D3748' }}>
       {/* Hover target to reveal the sidebar when it is collapsed */}
@@ -875,7 +919,11 @@ function Home() {
                         {message.experiment_id && streamingMessageId !== message.id && (
                           <div className="mt-4 pt-3 border-t border-dark-border">
                             <button
-                              onClick={() => navigate(`/demo/${message.experiment_id}`)}
+                              onClick={() =>
+                                navigate(`/demo/${message.experiment_id}`, {
+                                  state: { conversationId: currentConversation }
+                                })
+                              }
                               className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-low transition-colors"
                             >
                               <Play className="w-4 h-4" />

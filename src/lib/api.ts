@@ -12,10 +12,11 @@ export interface ExperimentGenerateRequest {
 
 export interface ExperimentData {
   experiment_id: string;
+  title?: string;
   html_content: string;
   css_content: string;
   js_content: string;
-  parameters: Array<{
+  parameters?: Array<{
     name: string;
     type: string;
     min?: number;
@@ -23,7 +24,7 @@ export interface ExperimentData {
     default: any;
     description: string;
   }>;
-  status: string;
+  status?: string;
 }
 
 export interface ApiResponse<T> {

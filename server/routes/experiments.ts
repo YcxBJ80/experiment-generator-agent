@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { perplexityMCPClient } from '../lib/perplexityMcpClient.js';
 import { DatabaseService } from '../lib/supabase.js';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth.js';
+import { extractExperimentHtml } from '../lib/htmlUtils.js';
 
 // Ensure environment variables are loaded
 const __filename = fileURLToPath(import.meta.url);
@@ -282,32 +283,29 @@ Now produce the summary followed by a complete, standalone HTML document inside 
         if (fullContent && message_id) {
           try {
             console.log('🔧 Starting to update complete message content...');
+            const { html: extractedHtml, title: extractedTitle } = extractExperimentHtml(fullContent);
+
+            // If experiment_id was not set before (backup plan)
+            if (!experiment_id) {
+              experiment_id = randomUUID();
+              console.log('🔧 Backup plan: setting experiment_id:', experiment_id);
+            }
+
+            const updatePayload: Record<string, unknown> = {
+              content: fullContent,
+              experiment_id
+            };
+
+            if (extractedHtml) {
+              updatePayload.html_content = extractedHtml;
+            }
             
-            // Parse generated content, extract HTML code block
-            const htmlMatch = fullContent.match(/```html\s*([\s\S]*?)\s*```/);
-            if (htmlMatch) {
-              const htmlContent = htmlMatch[1].trim();
-              
-              // If experiment_id was not set before (backup plan)
-              if (!experiment_id) {
-                experiment_id = randomUUID();
-                console.log('🔧 Backup plan: setting experiment_id:', experiment_id);
-              }
-              
-              // Update message's complete content and HTML content
-              await DatabaseService.updateMessage(message_id, {
-                content: fullContent,
-                experiment_id: experiment_id,
-                html_content: htmlContent
-              });
-              
-              console.log('✅ Message content update completed, experiment_id:', experiment_id);
+            await DatabaseService.updateMessage(message_id, updatePayload);
+            
+            if (extractedHtml) {
+              console.log('✅ Message content update completed, experiment_id:', experiment_id, 'Title:', extractedTitle || 'Experiment Demo');
             } else {
-              console.warn('⚠️ Failed to extract HTML code block from generated content');
-              // Update content even without HTML
-              await DatabaseService.updateMessage(message_id, {
-                content: fullContent
-              });
+              console.warn('⚠️ Failed to extract experiment HTML from generated content');
             }
           } catch (error) {
             console.error('❌ Error occurred while updating message content:', error);
