@@ -10,6 +10,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import remarkBreaks from 'remark-breaks';
+import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 
 interface Message {
@@ -88,7 +89,7 @@ function Home() {
   };
 
   const markdownRemarkPlugins = useMemo(() => [remarkGfm, remarkMath, remarkBreaks], []);
-  const markdownRehypePlugins = useMemo(() => [rehypeKatex], []);
+  const markdownRehypePlugins = useMemo(() => [rehypeRaw, rehypeKatex], []);
   type MarkdownElementProps = { node?: unknown; children?: ReactNode } & Record<string, unknown>;
 
   const markdownComponents = useMemo(
@@ -926,6 +927,7 @@ function Home() {
                             <>
                               <div className="markdown-content">
                                 <ReactMarkdown
+                                  key={`${message.id}-${message.content.length}`}
                                   remarkPlugins={markdownRemarkPlugins}
                                   rehypePlugins={markdownRehypePlugins}
                                   components={markdownComponents}
