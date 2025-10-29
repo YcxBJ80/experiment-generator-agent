@@ -8,6 +8,7 @@ export interface UserProfileRecord {
   password_hash: string;
   created_at: string;
   updated_at: string;
+  access_type?: 'software' | 'api' | null;
 }
 
 export type PublicUserProfile = Omit<UserProfileRecord, 'password_hash'>;
@@ -50,7 +51,7 @@ export class UserService {
 
     const { data, error } = await supabase
       .from('user_profiles')
-      .select('id, username, email, password_hash, created_at, updated_at')
+      .select('id, username, email, password_hash, created_at, updated_at, access_type')
       .eq('email', email.toLowerCase())
       .maybeSingle();
 
@@ -78,7 +79,7 @@ export class UserService {
 
     const { data, error } = await supabase
       .from('user_profiles')
-      .select('id, username, email, password_hash, created_at, updated_at')
+      .select('id, username, email, password_hash, created_at, updated_at, access_type')
       .eq('username', username)
       .maybeSingle();
 
@@ -99,7 +100,7 @@ export class UserService {
 
     const { data, error } = await supabase
       .from('user_profiles')
-      .select('id, username, email, created_at, updated_at')
+      .select('id, username, email, created_at, updated_at, access_type')
       .eq('id', id)
       .maybeSingle();
 
@@ -137,7 +138,7 @@ export class UserService {
       const { data, error } = await supabase
         .from('user_profiles')
         .insert([payload])
-        .select('id, username, email, created_at, updated_at')
+        .select('id, username, email, created_at, updated_at, access_type')
         .single();
 
       if (error) {

@@ -172,7 +172,8 @@ router.post('/login', async (req, res: ExpressResponse) => {
           username: user.username,
           email: user.email,
           created_at: user.created_at,
-          updated_at: user.updated_at
+          updated_at: user.updated_at,
+          access_type: user.access_type
         }
       }
     });

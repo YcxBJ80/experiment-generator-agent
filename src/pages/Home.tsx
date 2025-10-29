@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback, type ReactNode } fro
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, Send, Play, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { apiClient, type Conversation as ApiConversation, type Message as ApiMessage } from '@/lib/api';
-import { useAuth, useAuthActions } from '@/hooks/useAuth';
+import { useAuth, useAuthActions, useAuthStore } from '@/hooks/useAuth';
 import LightRays from '../components/LightRays';
 import DonationButton from '../components/DonationButton';
 import SurveyModal from '../components/SurveyModal';
@@ -10,7 +10,6 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import remarkBreaks from 'remark-breaks';
-import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 
 interface Message {
@@ -41,7 +40,10 @@ function Home() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { clearAuth } = useAuthActions();
+  const { clearAuth, setAuth } = useAuthActions();
+  
+  // Check if user is API-only (no experiment generation)
+  const isApiUser = user?.access_type === 'api';
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<string>('');
   const [pendingConversationId, setPendingConversationId] = useState<string | null>(null);
@@ -86,7 +88,7 @@ function Home() {
   };
 
   const markdownRemarkPlugins = useMemo(() => [remarkGfm, remarkMath, remarkBreaks], []);
-  const markdownRehypePlugins = useMemo(() => [rehypeRaw, rehypeKatex], []);
+  const markdownRehypePlugins = useMemo(() => [rehypeKatex], []);
   type MarkdownElementProps = { node?: unknown; children?: ReactNode } & Record<string, unknown>;
 
   const markdownComponents = useMemo(
@@ -235,6 +237,41 @@ function Home() {
 
     navigate(location.pathname, { replace: true, state: undefined });
   }, [location.pathname, location.state, navigate]);
+
+  // Auto-refresh user info to get latest access_type
+  useEffect(() => {
+    const refreshUserInfo = async () => {
+      try {
+        const response = await apiClient.getCurrentUser();
+        if (response.success && response.data) {
+          // Check if access_type has changed
+          if (response.data.access_type !== user?.access_type) {
+            console.log('🔄 User access_type updated:', response.data.access_type);
+            // Update the stored user info with the latest data
+            const currentToken = useAuthStore.getState().token;
+            if (currentToken) {
+              setAuth({
+                token: currentToken,
+                user: response.data
+              });
+              // Force page reload to apply new settings
+              window.location.reload();
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to refresh user info:', error);
+      }
+    };
+
+    // Check on mount
+    refreshUserInfo();
+
+    // Also check periodically (every 30 seconds)
+    const interval = setInterval(refreshUserInfo, 30000);
+    
+    return () => clearInterval(interval);
+  }, [user?.access_type, setAuth]);
 
   // Load conversation list
   useEffect(() => {
@@ -545,7 +582,8 @@ function Home() {
       let hasStartedExperimentIdCheck = false;
       let hasResolvedExperimentId = false;
       let isFirstChunk = true;
-      const expectExperimentResponse = !hadMessagesBeforeSend;
+      // API users don't generate experiments, software users do (only on first message)
+      const expectExperimentResponse = !hadMessagesBeforeSend && !isApiUser;
       if (!expectExperimentResponse) {
         hasResolvedExperimentId = true;
       }
@@ -852,7 +890,9 @@ function Home() {
                       className="custom-rays" 
                     />
                   </div>
-                  <h1 className="text-4xl font-bold text-dark-text text-center relative z-20">Visualize an Experiment</h1>
+                  <h1 className="text-4xl font-bold text-dark-text text-center relative z-20">
+                    {isApiUser ? 'Chat Assistant' : 'Visualize an Experiment'}
+                  </h1>
                 </div>
               )}
               {conversations
@@ -884,26 +924,18 @@ function Home() {
                             </div>
                           ) : isAssistant ? (
                             <>
-                              {isStreamingAssistant ? (
-                                <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                                  {message.content}
+                              <div className="markdown-content">
+                                <ReactMarkdown
+                                  remarkPlugins={markdownRemarkPlugins}
+                                  rehypePlugins={markdownRehypePlugins}
+                                  components={markdownComponents}
+                                >
+                                  {message.content || ''}
+                                </ReactMarkdown>
+                                {(message.isTyping || isStreamingAssistant) && (
                                   <span className="inline-block w-2 h-5 bg-primary animate-pulse"></span>
-                                </div>
-                              ) : (
-                                <div className="markdown-content">
-                                  <ReactMarkdown
-                                    key={`${message.id}-${message.content.length}`}
-                                    remarkPlugins={markdownRemarkPlugins}
-                                    rehypePlugins={markdownRehypePlugins}
-                                    components={markdownComponents}
-                                  >
-                                    {message.content || ''}
-                                  </ReactMarkdown>
-                                  {message.isTyping && (
-                                    <span className="inline-block w-2 h-5 bg-primary animate-pulse"></span>
-                                  )}
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </>
                           ) : (
                             <>
@@ -915,8 +947,8 @@ function Home() {
                           )}
                         </div>
 
-                        {/* Show the demo button when the assistant returned an experiment ID */}
-                        {message.experiment_id && streamingMessageId !== message.id && (
+                        {/* Show the demo button when the assistant returned an experiment ID (software users only) */}
+                        {!isApiUser && message.experiment_id && streamingMessageId !== message.id && (
                           <div className="mt-4 pt-3 border-t border-dark-border">
                             <button
                               onClick={() =>
@@ -961,7 +993,9 @@ function Home() {
                   className="custom-rays" 
                 />
               </div>
-              <h1 className="text-4xl font-bold text-dark-text text-center relative z-20">Visualize an Experiment</h1>
+              <h1 className="text-4xl font-bold text-dark-text text-center relative z-20">
+                {isApiUser ? 'Chat Assistant' : 'Visualize an Experiment'}
+              </h1>
             </div>
           )}
           
@@ -989,7 +1023,7 @@ function Home() {
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                  placeholder="Describe the experiment you want to create..."
+                  placeholder={isApiUser ? "Ask me anything..." : "Describe the experiment you want to create..."}
                   className="w-full px-6 py-4 pr-48 bg-dark-bg border border-dark-border rounded-2xl text-dark-text placeholder-dark-text-secondary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                   disabled={isGenerating}
                 />

@@ -9,6 +9,7 @@ import { perplexityMCPClient } from '../lib/perplexityMcpClient.js';
 import { JavaScriptValidator } from '../lib/jsValidator.js';
 import { DatabaseService, type Message as DbMessage } from '../lib/supabase.js';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth.js';
+import { UserService } from '../services/userService.js';
 import { extractExperimentHtml } from '../lib/htmlUtils.js';
 
 // Ensure environment variables are loaded
@@ -405,6 +406,11 @@ router.post('/generate-stream', requireAuth, async (req: AuthenticatedRequest, r
       });
     }
 
+    // Get user's access_type to determine if they can generate experiments
+    const userProfile = await UserService.findById(userId);
+    const isApiUser = userProfile?.access_type === 'api';
+    console.log('👤 User access_type:', userProfile?.access_type, '| API user:', isApiUser);
+
     const { prompt, conversation_id, message_id, model }: GenerateExperimentRequest & { message_id?: string } = req.body;
     
     const selectedModel = model || 'openai/gpt-5';
@@ -446,8 +452,9 @@ router.post('/generate-stream', requireAuth, async (req: AuthenticatedRequest, r
     }
 
     const isFirstTurn = chatHistory.length <= 1;
-    const mode: 'experiment' | 'chat' = isFirstTurn ? 'experiment' : 'chat';
-    console.log('Conversation history length:', chatHistory.length, 'isFirstTurn:', isFirstTurn, 'mode:', mode);
+    // API users always use chat mode, software users use experiment mode on first turn
+    const mode: 'experiment' | 'chat' = isApiUser ? 'chat' : (isFirstTurn ? 'experiment' : 'chat');
+    console.log('Conversation history length:', chatHistory.length, 'isFirstTurn:', isFirstTurn, 'isApiUser:', isApiUser, 'mode:', mode);
 
     if (mode === 'experiment') {
       if (!message_id) {
