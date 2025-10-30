@@ -38,17 +38,46 @@ const detectHtmlDocument = (source: string): string | null => {
 };
 
 const tryExtractFromFencedBlock = (source: string): string | null => {
-  const labelledMatch = extractFromMatch(source, /```html\s*([\s\S]*?)\s*```/i);
-  if (labelledMatch) {
-    return labelledMatch;
-  }
+  const scanBlocks = (fence: '```' | '~~~'): string | null => {
+    const pattern = new RegExp(`^\\s*${fence}([\\w-\\s]*)\\s*\\n?([\\s\\S]*?)\\s*${fence}`, 'gmi');
+    const fallbackCandidates: string[] = [];
 
-  const genericMatch = extractFromMatch(source, /```[\w-]*\s*([\s\S]*?)\s*```/i);
-  if (genericMatch && hasHtmlStructure(genericMatch)) {
-    return genericMatch;
-  }
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(source)) !== null) {
+      const language = (match[1] || '').trim().toLowerCase();
+      const payload = normaliseWhitespace(match[2] || '');
 
-  return null;
+      if (!payload) {
+        continue;
+      }
+
+      if (!language && hasHtmlStructure(payload)) {
+        return payload;
+      }
+
+      if (
+        language.includes('html') ||
+        language === 'xml' ||
+        language === 'markup' ||
+        language === 'htm' ||
+        language === 'xhtml'
+      ) {
+        return payload;
+      }
+
+      fallbackCandidates.push(payload);
+    }
+
+    for (const candidate of fallbackCandidates) {
+      if (hasHtmlStructure(candidate)) {
+        return candidate;
+      }
+    }
+
+    return null;
+  };
+
+  return scanBlocks('```') ?? scanBlocks('~~~');
 };
 
 const tryExtractFromBody = (source: string): string | null => {
