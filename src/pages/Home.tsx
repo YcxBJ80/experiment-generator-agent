@@ -88,8 +88,21 @@ function Home() {
     }
   };
 
-  const markdownRemarkPlugins = useMemo(() => [remarkGfm, remarkMath, remarkBreaks], []);
-  const markdownRehypePlugins = useMemo(() => [rehypeRaw, rehypeKatex], []);
+  const markdownRemarkPlugins = useMemo(
+    () => [
+      [remarkMath, { singleDollarTextMath: true }],
+      remarkGfm,
+      remarkBreaks
+    ],
+    []
+  );
+  const markdownRehypePlugins = useMemo(
+    () => [
+      rehypeKatex,
+      rehypeRaw
+    ],
+    []
+  );
   type MarkdownElementProps = { node?: unknown; children?: ReactNode } & Record<string, unknown>;
 
   const markdownComponents = useMemo(

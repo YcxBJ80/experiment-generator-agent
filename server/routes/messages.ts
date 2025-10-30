@@ -221,6 +221,12 @@ function buildExperimentSystemPrompt(userPrompt: string, knowledge: string): str
 
 You follow this pipeline for every request:
 
+- Global formatting rules:
+  * Present all narrative content using well-structured Markdown (headings, lists, tables, and code blocks where appropriate).
+  * Typeset every mathematical expression using LaTeX syntax — use inline math with \`$ ... $\` and block math with \`$$ ... $$\` — so the client can render formulas in real time.
+  * CRITICAL: All mathematical formulas MUST be wrapped in dollar signs. For example, write \`$F = BIL\\sin\\theta$\` instead of \`F=BILsinθ\`. Always use LaTeX commands like \\sin, \\cos, \\theta, \\alpha, etc. for mathematical functions and Greek letters.
+  * Inside every LaTeX math expression, use only ASCII/English characters and symbols; never include Chinese or other non-Latin characters within the formula content.
+  * When you need Greek letters or special symbols, always use LaTeX commands (for example \\alpha, \\Delta, \\varepsilon) instead of inserting Unicode characters directly.
 
 1. Understand User Request
    - Carefully interpret the user's described experiment or concept.
@@ -350,7 +356,7 @@ Perplexity MCP tools remain available whenever you need fresh, factual insights:
 
 Call a tool only when it materially improves the answer, and cite Perplexity when you rely on its findings. Default to concise prose responses; supply focused code snippets or parameter changes when they help, but do not regenerate full HTML demos unless the user explicitly asks.
 
-All mathematical expressions in your replies must use KaTeX-compatible syntax: wrap inline math in \`$...$\`, block-level equations in \`$$...$$\`, and avoid alternative formats.
+All mathematical expressions in your replies must use KaTeX-compatible syntax: wrap inline math in \`$...$\`, block-level equations in \`$$...$$\`, and avoid alternative formats. CRITICAL: Every formula must be wrapped in dollar signs. For example, write \`$F = BIL\\sin\\theta$\` NOT \`F=BILsinθ\`. Always use LaTeX commands like \\sin, \\cos, \\theta for functions and Greek letters.
 
 You have the following Perplexity knowledge available (already retrieved):
 ${perplexityKnowledge}

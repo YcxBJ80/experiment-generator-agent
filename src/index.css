@@ -131,3 +131,12 @@ body {
   margin: 0.75rem 0;
   text-align: left;
 }
+
+.markdown-content .katex .katex-mathml {
+  position: absolute;
+  left: -99999px;
+  clip: rect(1px, 1px, 1px, 1px);
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+}
